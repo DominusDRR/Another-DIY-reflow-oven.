@@ -28,7 +28,7 @@
 // *****************************************************************************
 
 #include "appled.h"
-
+#include "definitions.h"
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -60,6 +60,7 @@ APPLED_DATA appledData;
 
 /* TODO:  Add any necessary callback functions.
 */
+extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 
 // *****************************************************************************
 // *****************************************************************************
@@ -90,9 +91,7 @@ void APPLED_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
     appledData.state = APPLED_STATE_INIT;
-
-
-
+    RTC_Timer32Start(); // Start RTC
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
@@ -116,28 +115,22 @@ void APPLED_Tasks ( void )
         /* Application's initial state. */
         case APPLED_STATE_INIT:
         {
-           
-
-                appledData.state = APPLED_STATE_SERVICE_TASKS;
-            
+            appledData.adelay = RTC_Timer32CounterGet();
+            appledData.state = APPLED_LED_STATUS_BLINKING;
             break;
         }
-
-        case APPLED_STATE_SERVICE_TASKS:
+        case APPLED_LED_STATUS_BLINKING:
         {
-
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), appledData.adelay) > _500ms)
+            {
+                appledData.adelay = RTC_Timer32CounterGet();
+                LED_Toggle();
+            }
             break;
         }
-
         /* TODO: implement your application state machine.*/
-
-
         /* The default state should never be executed. */
-        default:
-        {
-            /* TODO: Handle error in application's state machine. */
-            break;
-        }
+        default: break; /* TODO: Handle error in application's state machine. */
     }
 }
 
