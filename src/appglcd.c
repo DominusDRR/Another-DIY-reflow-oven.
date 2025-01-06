@@ -28,7 +28,7 @@
 // *****************************************************************************
 
 #include "appglcd.h"
-
+#include "definitions.h"
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -57,7 +57,9 @@ APPGLCD_DATA appglcdData;
 // Section: Application Callback Functions
 // *****************************************************************************
 // *****************************************************************************
-
+extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
+extern bool IsGLCDTaskIdle (void);
+extern void LCDSend(unsigned char data, unsigned char cd);
 /* TODO:  Add any necessary callback functions.
 */
 
@@ -90,12 +92,11 @@ void APPGLCD_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
     appglcdData.state = APPGLCD_STATE_INIT;
-
-
-
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
+    appglcdData.adelay = RTC_Timer32CounterGet();
+    LCD_RTS_Clear(); //Start resetting the GLCD module
 }
 
 
@@ -106,36 +107,48 @@ void APPGLCD_Initialize ( void )
   Remarks:
     See prototype in appglcd.h.
  */
-
 void APPGLCD_Tasks ( void )
 {
-
     /* Check the application's current state. */
     switch ( appglcdData.state )
     {
         /* Application's initial state. */
         case APPGLCD_STATE_INIT:
         {
-            bool appInitialized = true;
-
-
-            if (appInitialized)
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), appglcdData.adelay) > _1000ms)
             {
-
-                appglcdData.state = APPGLCD_STATE_SERVICE_TASKS;
+               appglcdData.adelay = RTC_Timer32CounterGet(); 
+               LCD_RTS_Set(); 
+               appglcdData.state = APPGLCD_STATE_WAIT_1000ms;    
+            }    
+            break;
+        }
+        case APPGLCD_STATE_WAIT_1000ms:
+        {
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), appglcdData.adelay) > _1000ms)
+            {
+                appglcdData.state = APPGLCD_STATE_LCD_EXTENDED_COMMANDS;
             }
             break;
         }
-
-        case APPGLCD_STATE_SERVICE_TASKS:
+        /* TODO: implement your application state machine.*/
+        case APPGLCD_STATE_LCD_EXTENDED_COMMANDS:
         {
-
+            if (IsGLCDTaskIdle ()) //I wait until the SERCOM1 task is idle
+            {
+                LCDSend(0x21, SEND_CMD);
+                appglcdData.state = APPGLCD_STATE_LCD_SET_VOP;
+            }
             break;
         }
-
-        /* TODO: implement your application state machine.*/
-
-
+        case APPGLCD_STATE_LCD_SET_VOP:
+        {
+            if (IsGLCDTaskIdle ()) //I wait until the SERCOM1 task is idle
+            {
+                
+            }
+            break;
+        }    
         /* The default state should never be executed. */
         default:
         {
