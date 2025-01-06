@@ -47,8 +47,10 @@ extern "C" {
 // Section: Type Definitions
 // *****************************************************************************
 // *****************************************************************************
-#define  NO_ERROR       0x00
-#define  SPI_OPEN_ERROR 0x01    
+#define  SPI1_NO_ERROR       0x00
+#define  SPI1_OPEN_ERROR     0x01
+#define  SPI1_TRANSMISSION   0x02       
+#define  SPI1_HANLDER_ERROR  0x03  
 // *****************************************************************************
 /* Application states
 
@@ -66,7 +68,10 @@ typedef enum
     APPSPI1_STATE_INIT=0,
     APPSPI1_STATE_DRIVER_SETUP,
     /* TODO: Define states used by the application state machine. */
-    APPSPI1_STATE_IDLE,        
+    APPSPI1_STATE_IDLE,
+    APPSPI1_START_TRANSMISSION,
+    APPSPI1_TRANSMISSION,
+    APPSPI1_WAIT_FOR_TRANSMISSION_END,        
     APPSPI1_STATE_ERROR
 } APPSPI1_STATES;
 
@@ -92,8 +97,10 @@ typedef struct
     DRV_HANDLE drvSPIHandle;
     DRV_SPI_TRANSFER_HANDLE transferHandle;
     DRV_SPI_TRANSFER_SETUP  setup; 
-    
     uint8_t typeOfError;
+    uint8_t bufferTX[32]; //Buffer for transmission
+    uint8_t numberBytesTransm; //number of bytes to be transmitted
+    bool isTransferComplete;
 } APPSPI1_DATA;
 
 // *****************************************************************************
