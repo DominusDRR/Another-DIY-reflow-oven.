@@ -28,7 +28,7 @@
 // *****************************************************************************
 
 #include "appspi1.h"
-
+#include "definitions.h"
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -66,11 +66,66 @@ APPSPI1_DATA appspi1Data;
 // Section: Application Local Functions
 // *****************************************************************************
 // *****************************************************************************
-
-
+bool IsGLCDTaskIdle (void);
+void LCDSend(unsigned char data, unsigned char cd);
+static void SPI1Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRANSFER_HANDLE transferHandle, uintptr_t context);
 /* TODO:  Add any necessary local functions.
 */
+/****************************************************************************/
+/*  Determines whether the GLCD module task is idle so it can send or receive 
+ *  data */                                                             
+/*  Function : IsGLCDTaskIdle                                               */
+/*      Parameters                                                          */
+/*          Input   :  Nothing                                              */
+/*          Output  :  true or false                                        */
+/****************************************************************************/
+bool IsGLCDTaskIdle (void)
+{
+    if (APPSPI1_STATE_IDLE == appspi1Data.state)
+    {        
+        return true;
+    }
+    return false;
+}
+/****************************************************************************/
+/*  Send to LCD                                                             */
+/*  Function : LCDSend                                                      */
+/*      Parameters                                                          */
+/*          Input   :  data and  SEND_CHR or SEND_CMD                       */
+/*          Output  :  Nothing                                              */
+/****************************************************************************/
+void LCDSend(unsigned char data, unsigned char cd)
+{
+    SS1_Clear();
 
+    if (cd == SEND_CHR)
+    {
+        LCD_D_Set();
+    }
+    else
+    {
+        LCD_D_Clear();
+    }
+    appspi1Data.bufferTX[0x00] = data;
+    appspi1Data.numberBytesTransm = 0x01;
+    // send data over SPI
+    appspi1Data.state = APPSPI1_START_TRANSMISSION;
+    //SEND_BYTE_SPI();
+    //LCD_CS_HIGH();
+}
+static void SPI1Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRANSFER_HANDLE transferHandle, uintptr_t context)
+{
+    if (event == DRV_SPI_TRANSFER_EVENT_COMPLETE)
+    {
+        appspi1Data.isTransferComplete = true;
+    }
+    else
+    {
+        appspi1Data.isTransferComplete = false;
+        appspi1Data.typeOfError = SPI1_TRANSMISSION;
+        appspi1Data.state = APPSPI1_STATE_ERROR;
+    }
+}
 
 // *****************************************************************************
 // *****************************************************************************
@@ -95,6 +150,7 @@ void APPSPI1_Initialize ( void )
      */
     SS1_Set();
     appspi1Data.drvSPIHandle = DRV_HANDLE_INVALID;
+    appspi1Data.typeOfError = SPI1_NO_ERROR;
 }
 
 
@@ -132,13 +188,39 @@ void APPSPI1_Tasks ( void )
             }
             else
             {
-                appspi1Data.typeOfError = SPI_OPEN_ERROR;
+                appspi1Data.typeOfError = SPI1_OPEN_ERROR;
                 appspi1Data.state = APPSPI1_STATE_ERROR;
             }    
             break;
         }
         /* TODO: implement your application state machine.*/
         case APPSPI1_STATE_IDLE: break; // It waits until another process wants to write or read information on the SPI bus.
+        case APPSPI1_START_TRANSMISSION:
+        {
+            DRV_SPI_TransferEventHandlerSet(appspi1Data.drvSPIHandle, SPI1Instance1EventHandler, (uintptr_t)0);
+            appspi1Data.state = APPSPI1_TRANSMISSION;
+            break;
+        }
+        case APPSPI1_TRANSMISSION:
+        {
+            appspi1Data.state = APPSPI1_WAIT_FOR_TRANSMISSION_END;
+            DRV_SPI_WriteTransferAdd(appspi1Data.drvSPIHandle, appspi1Data.bufferTX, appspi1Data.numberBytesTransm, &appspi1Data.transferHandle );
+            if(appspi1Data.transferHandle == DRV_SPI_TRANSFER_HANDLE_INVALID)
+            {
+                appspi1Data.typeOfError = SPI1_HANLDER_ERROR;
+                appspi1Data.state = APPSPI1_STATE_ERROR;
+            }
+            break;
+        }
+        case APPSPI1_WAIT_FOR_TRANSMISSION_END:
+        {
+            if (appspi1Data.isTransferComplete == true)
+            {
+                appspi1Data.isTransferComplete = false;
+                appspi1Data.state = APPSPI1_STATE_IDLE;
+            }
+            break;
+        }    
         case APPSPI1_STATE_ERROR:
         {
 
