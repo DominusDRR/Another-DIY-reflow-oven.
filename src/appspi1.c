@@ -90,12 +90,11 @@ void APPSPI1_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
     appspi1Data.state = APPSPI1_STATE_INIT;
-
-
-
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
+    SS1_Set();
+    appspi1Data.drvSPIHandle = DRV_HANDLE_INVALID;
 }
 
 
@@ -109,39 +108,44 @@ void APPSPI1_Initialize ( void )
 
 void APPSPI1_Tasks ( void )
 {
-
     /* Check the application's current state. */
     switch ( appspi1Data.state )
     {
         /* Application's initial state. */
         case APPSPI1_STATE_INIT:
         {
-            bool appInitialized = true;
-
-
-            if (appInitialized)
+            appspi1Data.setup.baudRateInHz    = 1000000;
+            appspi1Data.setup.clockPhase      = DRV_SPI_CLOCK_PHASE_VALID_LEADING_EDGE;
+            appspi1Data.setup.clockPolarity   = DRV_SPI_CLOCK_POLARITY_IDLE_LOW;
+            appspi1Data.setup.dataBits        = DRV_SPI_DATA_BITS_8;
+            appspi1Data.setup.chipSelect      = SS1_PIN;
+            appspi1Data.setup.csPolarity      = DRV_SPI_CS_POLARITY_ACTIVE_LOW;
+            appspi1Data.state = APPSPI1_STATE_DRIVER_SETUP;
+            break;
+        }
+        case APPSPI1_STATE_DRIVER_SETUP:
+        {
+            appspi1Data.drvSPIHandle = DRV_SPI_Open( DRV_SPI_INDEX_0, DRV_IO_INTENT_READWRITE );
+            if(appspi1Data.drvSPIHandle != DRV_HANDLE_INVALID)
             {
-
-                appspi1Data.state = APPSPI1_STATE_SERVICE_TASKS;
+                appspi1Data.state = APPSPI1_STATE_IDLE;
             }
+            else
+            {
+                appspi1Data.typeOfError = SPI_OPEN_ERROR;
+                appspi1Data.state = APPSPI1_STATE_ERROR;
+            }    
             break;
         }
-
-        case APPSPI1_STATE_SERVICE_TASKS:
-        {
-
-            break;
-        }
-
         /* TODO: implement your application state machine.*/
-
-
-        /* The default state should never be executed. */
-        default:
+        case APPSPI1_STATE_IDLE: break; // It waits until another process wants to write or read information on the SPI bus.
+        case APPSPI1_STATE_ERROR:
         {
-            /* TODO: Handle error in application's state machine. */
+
             break;
-        }
+        } 
+        /* The default state should never be executed. */
+        default: break;  /* TODO: Handle error in application's state machine. */
     }
 }
 
