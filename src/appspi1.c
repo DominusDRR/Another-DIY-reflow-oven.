@@ -57,7 +57,7 @@ APPSPI1_DATA appspi1Data;
 // Section: Application Callback Functions
 // *****************************************************************************
 // *****************************************************************************
-
+extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 /* TODO:  Add any necessary callback functions.
 */
 
@@ -97,7 +97,6 @@ bool IsGLCDTaskIdle (void)
 void LCDSend(unsigned char data, unsigned char cd)
 {
     SS1_Clear();
-
     if (cd == SEND_CHR)
     {
         LCD_D_Set();
@@ -184,6 +183,7 @@ void APPSPI1_Tasks ( void )
             appspi1Data.drvSPIHandle = DRV_SPI_Open( DRV_SPI_INDEX_0, DRV_IO_INTENT_READWRITE );
             if(appspi1Data.drvSPIHandle != DRV_HANDLE_INVALID)
             {
+                appspi1Data.typeOfError = SPI1_NO_ERROR; //If it comes from APPSPI1_STATE_DELAY_TO_REOPEN_SPI state, it needs to be cleared
                 appspi1Data.state = APPSPI1_STATE_IDLE;
             }
             else
@@ -216,16 +216,42 @@ void APPSPI1_Tasks ( void )
         {
             if (appspi1Data.isTransferComplete == true)
             {
+                SS1_Set();
                 appspi1Data.isTransferComplete = false;
-                appspi1Data.state = APPSPI1_STATE_IDLE;
+                if (SPI1_NO_ERROR == appspi1Data.typeOfError)
+                {    
+                    appspi1Data.state = APPSPI1_STATE_IDLE;
+                }
             }
             break;
         }    
         case APPSPI1_STATE_ERROR:
         {
-
+            SS1_Set();
+            switch(appspi1Data.typeOfError)
+            {
+                case SPI1_OPEN_ERROR:
+                {
+                    appspi1Data.adelay = RTC_Timer32CounterGet();
+                    appspi1Data.state = APPSPI1_STATE_DELAY_TO_REOPEN_SPI;
+                    break;
+                }
+                default:
+                {
+                    DRV_SPI_Close(appspi1Data.drvSPIHandle);
+                    APPSPI1_Initialize();
+                }    
+            }        
             break;
-        } 
+        }
+        case APPSPI1_STATE_DELAY_TO_REOPEN_SPI:
+        {
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), appspi1Data.adelay) > _500ms)
+            {
+                appspi1Data.state = APPSPI1_STATE_DRIVER_SETUP;
+            }
+            break;
+        }    
         /* The default state should never be executed. */
         default: break;  /* TODO: Handle error in application's state machine. */
     }
