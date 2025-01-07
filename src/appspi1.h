@@ -72,7 +72,8 @@ typedef enum
     APPSPI1_START_TRANSMISSION,
     APPSPI1_TRANSMISSION,
     APPSPI1_WAIT_FOR_TRANSMISSION_END,        
-    APPSPI1_STATE_ERROR
+    APPSPI1_STATE_ERROR,
+    APPSPI1_STATE_DELAY_TO_REOPEN_SPI
 } APPSPI1_STATES;
 
 
@@ -101,6 +102,7 @@ typedef struct
     uint8_t bufferTX[32]; //Buffer for transmission
     uint8_t numberBytesTransm; //number of bytes to be transmitted
     bool isTransferComplete;
+    uint32_t adelay;
 } APPSPI1_DATA;
 
 // *****************************************************************************
