@@ -66,7 +66,7 @@ extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 // Section: Application Local Functions
 // *****************************************************************************
 // *****************************************************************************
-bool IsGLCDTaskIdle (void);
+bool IsSPI1TaskIdle (void);
 void LCDSend(unsigned char data, unsigned char cd);
 static void SPI1Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRANSFER_HANDLE transferHandle, uintptr_t context);
 /* TODO:  Add any necessary local functions.
@@ -79,7 +79,7 @@ static void SPI1Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRA
 /*          Input   :  Nothing                                              */
 /*          Output  :  true or false                                        */
 /****************************************************************************/
-bool IsGLCDTaskIdle (void)
+bool IsSPI1TaskIdle (void)
 {
     if (APPSPI1_STATE_IDLE == appspi1Data.state)
     {        
