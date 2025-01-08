@@ -46,7 +46,17 @@ extern "C" {
 // Section: Type Definitions
 // *****************************************************************************
 // *****************************************************************************
+#define LCD_X_RES                  84
+#define LCD_Y_RES                  48
 
+#define PIXEL_OFF                  0
+#define PIXEL_ON                   1
+#define PIXEL_XOR                  2
+
+#define FONT_1X                    1
+#define FONT_2X                    2   
+// this is the buffer size
+#define LCD_CACHE_SIZE             ((LCD_X_RES * LCD_Y_RES) / 8)
 // *****************************************************************************
 /* Application states
 
@@ -64,8 +74,13 @@ typedef enum
     APPGLCD_STATE_INIT=0,
     APPGLCD_STATE_WAIT_1000ms,
     /* TODO: Define states used by the application state machine. */
-    APPGLCD_STATE_LCD_EXTENDED_COMMANDS,
-    APPGLCD_STATE_LCD_SET_VOP
+    APPGLCD_STATE_LCD_COMMANDS,
+    APPGLCD_STATE_START_CLEANING_GLCD,
+    APPGLCD_STATE_CLEAR_LCD,
+    APPGLCD_STATE_START_GLCD_UPDATE,
+    APPGLCD_STATE_WRITE_Y_COORDINATES,
+    APPGLCD_STATE_WRITE_X_COORDINATES,
+    APPGLCD_STATE_IDLE
 } APPGLCD_STATES;
 
 
@@ -88,6 +103,9 @@ typedef struct
     APPGLCD_STATES state;
     /* TODO: Define any additional data used by the application. */
     uint32_t adelay;
+    size_t pointerX;
+    size_t pointerY;
+    uint8_t LcdMemory[LCD_CACHE_SIZE];
 } APPGLCD_DATA;
 
 // *****************************************************************************
