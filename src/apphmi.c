@@ -58,6 +58,7 @@ APPHMI_DATA apphmiData;
 // *****************************************************************************
 // *****************************************************************************
 extern bool IsGLCDTaskIdle (void);
+extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 /* TODO:  Add any necessary callback functions.
 */
 
@@ -119,6 +120,7 @@ void APPHMI_Tasks ( void )
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
                 apphmiData.state = APPHMI_STATE_SERVICE_TASKS;
+                LCDLine (1, 1, 30, 30); // This test consists of drawing a line in the GLCD to verify the operation of the created libraries.
             }
             break;
         }
