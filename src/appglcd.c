@@ -79,6 +79,19 @@ extern void LCDSend(unsigned char data, unsigned char cd);
 // *****************************************************************************
 // *****************************************************************************
 
+bool IsGLCDTaskIdle (void);
+void LCDPixelXY(uint32_t x, uint32_t y);
+void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+/* TODO:  Add any necessary local functions.
+*/
+/****************************************************************************/
+/*  Determines whether the GLCD module task is idle so it can send or receive 
+ *  data */                                                             
+/*  Function : IsGLCDTaskIdle                                               */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  true or false                                                */
+/****************************************************************************/
 bool IsGLCDTaskIdle (void)
 {
     if (APPGLCD_STATE_IDLE == appglcdData.state)
@@ -87,10 +100,63 @@ bool IsGLCDTaskIdle (void)
     }
     return false;
 }
+/****************************************************************************/
+/*  Send to LCD                                                             */
+/*  Function : LCDPixelXY                                                   */
+/*  Parameters                                                              */
+/*  Input   :  x and y coordinates where you want to graph a point          */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDPixelXY(uint32_t x, uint32_t y)
+{
+    uint32_t index = 0;
+    //uint16_t i = 0;
+    
+    // check for out off range
+    if ((x > LCD_X_RES)||(x < 0)) return;
+    if ((y > LCD_Y_RES)||(y < 0)) return;
 
-/* TODO:  Add any necessary local functions.
-*/
-
+    index = x + ((y/8))*84 ;
+    appglcdData.LcdMemory[index] |= (uint8_t)(1<<(y%8));
+    //The process of updating GLCD information begins
+    appglcdData.pointerY1 = 0x00;
+    appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
+}
+/****************************************************************************/
+/*  Send to LCD                                                             */
+/*  Function : LCDLine                                                      */
+/*  Parameters                                                              */
+/*  Input   :  x1, x2 and y1, y2 coordinates where you want to graph a line */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2) //draw a line
+{      
+    appglcdData.dx = abs (x2 - x1);
+    appglcdData.dy = abs (y2 - y1);
+    if ( x1 < x2) 
+    {
+        appglcdData.sx = 1;
+    }
+    else 
+    {    
+        appglcdData.sx = -1;
+    }
+    if (y1 < y2) 
+    {
+        appglcdData.sy = 1;
+    }
+    else 
+    {    
+        appglcdData.sy = -1;
+    }
+    
+    appglcdData.error1 = appglcdData.dx - appglcdData.dy;
+    appglcdData.pointerX1 = x1;
+    appglcdData.pointerY1 = y1;
+    appglcdData.pointerX2 = x2;
+    appglcdData.pointerY2 = y2;
+    appglcdData.state = APPGLCD_STATE_GRAPH_LINE;
+}
 
 // *****************************************************************************
 // *****************************************************************************
@@ -145,7 +211,7 @@ void APPGLCD_Tasks ( void )
         {
             if ( abs_diff_uint32(RTC_Timer32CounterGet(), appglcdData.adelay) > _1000ms)
             {
-                appglcdData.pointerX = 0x00;
+                appglcdData.pointerX1 = 0x00;
                 appglcdData.state = APPGLCD_STATE_LCD_COMMANDS;
             }
             break;
@@ -155,9 +221,9 @@ void APPGLCD_Tasks ( void )
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
             {
-                LCDSend(commandsInitializeGLCD[appglcdData.pointerX], SEND_CMD);
-                appglcdData.pointerX++;
-                if (appglcdData.pointerX >= sizeof(commandsInitializeGLCD))
+                LCDSend(commandsInitializeGLCD[appglcdData.pointerX1], SEND_CMD);
+                appglcdData.pointerX1++;
+                if (appglcdData.pointerX1 >= sizeof(commandsInitializeGLCD))
                 {    
                     appglcdData.state = APPGLCD_STATE_START_CLEANING_GLCD;
                 }    
@@ -168,21 +234,21 @@ void APPGLCD_Tasks ( void )
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
             {
-                appglcdData.pointerX = 0x00;
+                appglcdData.pointerX1 = 0x00;
                 appglcdData.state = APPGLCD_STATE_CLEAR_LCD;
             }
             break;
         }
         case APPGLCD_STATE_CLEAR_LCD:
         {
-            if (appglcdData.pointerX < sizeof(appglcdData.LcdMemory))
+            if (appglcdData.pointerX1 < sizeof(appglcdData.LcdMemory))
             {
-                appglcdData.LcdMemory[appglcdData.pointerX] = 0x00;
-                appglcdData.pointerX++;
+                appglcdData.LcdMemory[appglcdData.pointerX1] = 0x00;
+                appglcdData.pointerX1++;
             }
             else
             {
-                appglcdData.pointerY = 0x00;
+                appglcdData.pointerY1 = 0x00;
                 appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
             }
             break;
@@ -191,7 +257,7 @@ void APPGLCD_Tasks ( void )
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
             {
-                if (appglcdData.pointerY < (48/8))
+                if (appglcdData.pointerY1 < (48/8))
                 {
                     LCDSend(0x80, SEND_CMD);
                     appglcdData.state = APPGLCD_STATE_WRITE_Y_COORDINATES;  
@@ -207,30 +273,64 @@ void APPGLCD_Tasks ( void )
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
             {
-                LCDSend(0x40 | (uint8_t)(appglcdData.pointerY), SEND_CMD);
+                LCDSend(0x40 | (uint8_t)(appglcdData.pointerY1), SEND_CMD);
                 appglcdData.state = APPGLCD_STATE_WRITE_X_COORDINATES; 
-                appglcdData.pointerX = 0x00;
+                appglcdData.pointerX1 = 0x00;
             }
             break;
         }
         case APPGLCD_STATE_WRITE_X_COORDINATES:
         {
-            if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
+            if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
             {
-                if (appglcdData.pointerX < 84)
+                if (appglcdData.pointerX1 < 84)
                 {
-                    LCDSend(appglcdData.LcdMemory[appglcdData.pointerY * 84 + appglcdData.pointerX], SEND_CHR);
-                    appglcdData.pointerX++;
+                    LCDSend(appglcdData.LcdMemory[appglcdData.pointerY1 * 84 + appglcdData.pointerX1], SEND_CHR);
+                    appglcdData.pointerX1++;
                 }
                 else
                 {
                     appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
-                    appglcdData.pointerY++;
+                    appglcdData.pointerY1++;
                 }
             }
             break;
         }
         case APPGLCD_STATE_IDLE: break;
+        case APPGLCD_STATE_GRAPH_LINE:
+        {
+            if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
+            {
+                LCDPixelXY (appglcdData.pointerX1, appglcdData.pointerY1);
+                if ((appglcdData.pointerX1 == appglcdData.pointerX2) && (appglcdData.pointerY1 == appglcdData.pointerY2))
+                {
+                    appglcdData.state = APPGLCD_STATE_WAIT_PROCESS_COMPLETION_GLCD; 
+                }
+                else
+                {
+                    appglcdData.error2 = 2*appglcdData.error1;
+                    if (appglcdData.error2 > -appglcdData.dy) 
+                    {
+                        appglcdData.error1 = appglcdData.error1 - appglcdData.dy;
+                        appglcdData.pointerX1 = appglcdData.pointerX1 + appglcdData.sx;
+                    }
+                    if (appglcdData.error2 < appglcdData.dx) 
+                    {
+                        appglcdData.error1 = appglcdData.error1 + appglcdData.dx;
+                        appglcdData.pointerY1 = appglcdData.pointerY1 + appglcdData.sy;
+                    }
+                }
+            }
+            break;
+        }
+        case APPGLCD_STATE_WAIT_PROCESS_COMPLETION_GLCD:
+        {
+            if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
+            {
+                appglcdData.state = APPGLCD_STATE_IDLE; 
+            }
+            break;
+        }
         /* The default state should never be executed. */
         default: break; /* TODO: Handle error in application's state machine. */
     }
