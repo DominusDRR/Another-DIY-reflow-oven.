@@ -72,9 +72,9 @@ static void SPI1Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRA
 /* TODO:  Add any necessary local functions.
 */
 /****************************************************************************/
-/*  Determines whether the GLCD module task is idle so it can send or receive 
- *  data */                                                             
-/*  Function : IsGLCDTaskIdle                                               */
+/*  Determines whether the SERCOM1 module task is idle so it can send or 
+ * receive data                                                             */                                                             
+/*  Function : IsSPI1TaskIdle                                               */
 /*      Parameters                                                          */
 /*          Input   :  Nothing                                              */
 /*          Output  :  true or false                                        */
