@@ -80,7 +80,9 @@ typedef enum
     APPGLCD_STATE_START_GLCD_UPDATE,
     APPGLCD_STATE_WRITE_Y_COORDINATES,
     APPGLCD_STATE_WRITE_X_COORDINATES,
-    APPGLCD_STATE_IDLE
+    APPGLCD_STATE_IDLE,
+    APPGLCD_STATE_GRAPH_LINE,
+    APPGLCD_STATE_WAIT_PROCESS_COMPLETION_GLCD        
 } APPGLCD_STATES;
 
 
@@ -103,8 +105,13 @@ typedef struct
     APPGLCD_STATES state;
     /* TODO: Define any additional data used by the application. */
     uint32_t adelay;
-    size_t pointerX;
-    size_t pointerY;
+    size_t pointerX1;
+    size_t pointerY1;
+    size_t pointerX2;
+    size_t pointerY2;
+    size_t error1;
+    size_t error2;
+    int32_t dx, dy, sx, sy;
     uint8_t LcdMemory[LCD_CACHE_SIZE];
 } APPGLCD_DATA;
 
