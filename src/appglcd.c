@@ -156,6 +156,7 @@ void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2) //draw a line
     appglcdData.pointerX2 = x2;
     appglcdData.pointerY2 = y2;
     appglcdData.state = APPGLCD_STATE_GRAPH_LINE;
+    appglcdData.stateToReturn = APPGLCD_STATE_GRAPH_LINE;
 }
 
 // *****************************************************************************
@@ -264,7 +265,7 @@ void APPGLCD_Tasks ( void )
                 }
                 else
                 {
-                    appglcdData.state = APPGLCD_STATE_IDLE; 
+                    appglcdData.state = appglcdData.stateToReturn;//APPGLCD_STATE_IDLE; 
                 }
             }
             break;
