@@ -113,6 +113,7 @@ typedef struct
     size_t error2;
     int32_t dx, dy, sx, sy;
     uint8_t LcdMemory[LCD_CACHE_SIZE];
+    APPGLCD_STATES stateToReturn;
 } APPGLCD_DATA;
 
 // *****************************************************************************
