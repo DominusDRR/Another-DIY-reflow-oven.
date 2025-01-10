@@ -49,19 +49,41 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "peripheral/nvmctrl/plib_nvmctrl.h"
+#include "peripheral/sercom/i2c_master/plib_sercom2_i2c_master.h"
+#include "peripheral/sercom/spi_master/plib_sercom1_spi_master.h"
 #include "peripheral/evsys/plib_evsys.h"
-#include "peripheral/pm/plib_pm.h"
 #include "peripheral/port/plib_port.h"
 #include "peripheral/clock/plib_clock.h"
 #include "peripheral/nvic/plib_nvic.h"
+#include "peripheral/pm/plib_pm.h"
 #include "peripheral/rtc/plib_rtc.h"
+#include "peripheral/dsu/plib_dsu.h"
+#include "driver/i2c/drv_i2c.h"
+#include "driver/spi/drv_spi.h"
+#include "system/int/sys_int.h"
+#include "system/ports/sys_ports.h"
+#include "osal/osal.h"
+#include "system/debug/sys_debug.h"
 #include "appled.h"
+#include "appspi1.h"
+#include "appglcd.h"
+#include "apphmi.h"
+#include "appeeram.h"
+#include "appi2c2.h"
+#include "appdsu.h"
 
 //The RTC is decremented each cycle to 1/32768 Hz or 30,518 us
 //_1ms = 32768/1000 = 32.768
 
-#define _1ms        33
-#define _500ms      163684
+#define _1ms            33
+#define _25ms           819
+#define _500ms          16384
+#define _1000ms         32768
+
+/** GLC & SERCOM1 definitios **/
+#define SEND_CMD                   0
+#define SEND_CHR                   1
+
 
 // DOM-IGNORE-BEGIN
 #ifdef __cplusplus  // Provide C++ Compatibility
@@ -167,6 +189,37 @@ Remarks:
 
 void SYS_Tasks ( void );
 
+// *****************************************************************************
+// *****************************************************************************
+// Section: Type Definitions
+// *****************************************************************************
+// *****************************************************************************
+
+// *****************************************************************************
+/* System Objects
+
+Summary:
+    Structure holding the system's object handles
+
+Description:
+    This structure contains the object handles for all objects in the
+    MPLAB Harmony project's system configuration.
+
+Remarks:
+    These handles are returned from the "Initialize" functions for each module
+    and must be passed into the "Tasks" function for each module.
+*/
+
+typedef struct
+{
+    /* I2C0 Driver Object */
+    SYS_MODULE_OBJ drvI2C0;
+
+    /* SPI0 Driver Object */
+    SYS_MODULE_OBJ drvSPI0;
+
+
+} SYSTEM_OBJECTS;
 
 // *****************************************************************************
 // *****************************************************************************
@@ -176,6 +229,7 @@ void SYS_Tasks ( void );
 
 
 
+extern SYSTEM_OBJECTS sysObj;
 
 //DOM-IGNORE-BEGIN
 #ifdef __cplusplus
