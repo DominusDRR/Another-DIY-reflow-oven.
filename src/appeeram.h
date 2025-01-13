@@ -140,7 +140,17 @@ typedef struct
     uint8_t errorAPPEERAM;
     APPEERAM_STATES stateWhereToJumpAfterCRC;
     uint8_t attempts;
-    //uint32_t crcCalculado;
+    uint8_t  temperatureA;
+    uint16_t timeA;
+    uint8_t  temperatureB;
+    uint16_t timeB;
+    uint8_t  temperatureC;
+    uint16_t timeC;
+    uint8_t  temperatureD;
+    uint16_t timeD;
+    float   Kp;
+    float   Ki;
+    float   Kd;
 } APPEERAM_DATA;
 
 // *****************************************************************************
