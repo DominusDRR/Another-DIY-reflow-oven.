@@ -134,14 +134,14 @@ APPEERAM_STATES analyzeNumberAttempts(void)
 
 bool verifyDataStoredInEERAM(void)
 {
-    uint16_t time;
     /* Parameters of point A of the temperature curve */
     if (BufferReception[0x00] > MAXIMUM_TEMPERATURE_PER_POINT)
     {
         return false;
     }
-    time = (uint16_t)BufferReception[0x01] | ((uint16_t)BufferReception[0x02] << 8);
-    if (time > MAXIMUM_HEAT_TIME || time < MINIMUM_HEAT_TIME)
+    appeeramData.temperatureA = BufferReception[0x00];
+    appeeramData.timeA = (uint16_t)BufferReception[0x01] | ((uint16_t)BufferReception[0x02] << 8);
+    if (appeeramData.timeA > MAXIMUM_HEAT_TIME || appeeramData.timeA < MINIMUM_HEAT_TIME)
     {
         return false;
     }
@@ -150,8 +150,9 @@ bool verifyDataStoredInEERAM(void)
     {
         return false;
     }
-    time = (uint16_t)BufferReception[0x04] | ((uint16_t)BufferReception[0x05] << 8);
-    if (time > MAXIMUM_FLUX_ACTIVATION_TIME || time < MINIMUM_FLUX_ACTIVATION_TIME)
+    appeeramData.temperatureB = BufferReception[0x03];
+    appeeramData.timeB = (uint16_t)BufferReception[0x04] | ((uint16_t)BufferReception[0x05] << 8);
+    if (appeeramData.timeB > MAXIMUM_FLUX_ACTIVATION_TIME || appeeramData.timeB < MINIMUM_FLUX_ACTIVATION_TIME)
     {
         return false;
     }
@@ -160,8 +161,9 @@ bool verifyDataStoredInEERAM(void)
     {
         return false;
     }
-    time = (uint16_t)BufferReception[0x07] | ((uint16_t)BufferReception[0x08] << 8);
-    if (time > MAXIMUM_REFLOW_TIME || time < MINIMUM_REFLOW_TIME )
+    appeeramData.temperatureC = BufferReception[0x06];
+    appeeramData.timeC = (uint16_t)BufferReception[0x07] | ((uint16_t)BufferReception[0x08] << 8);
+    if (appeeramData.timeC > MAXIMUM_REFLOW_TIME || appeeramData.timeC < MINIMUM_REFLOW_TIME )
     {
         return false;
     }
@@ -170,24 +172,24 @@ bool verifyDataStoredInEERAM(void)
     {
         return false;
     }
-    time = (uint16_t)BufferReception[0x0A] | ((uint16_t)BufferReception[0x0B] << 8);
-    if (time > MAXIMUM_COOLING_TIME || time < MINIMUM_COOLING_TIME)
+    appeeramData.temperatureD = BufferReception[0x09];
+    appeeramData.timeD = (uint16_t)BufferReception[0x0A] | ((uint16_t)BufferReception[0x0B] << 8);
+    if (appeeramData.timeD > MAXIMUM_COOLING_TIME || appeeramData.timeD < MINIMUM_COOLING_TIME)
     {
         return false;
     }
-    float k;
-    memcpy(&k, &BufferReception[0x0C], sizeof(float)); //Kp
-    if (k < 0)
+    memcpy(&appeeramData.Kp, &BufferReception[0x0C], sizeof(float)); //Kp
+    if (appeeramData.Kp < 0)
     {
         return false;
     }
-    memcpy(&k, &BufferReception[0x10], sizeof(float)); //Ki    
-    if (k < 0)
+    memcpy(&appeeramData.Ki, &BufferReception[0x10], sizeof(float)); //Ki    
+    if (appeeramData.Ki < 0)
     {
         return false;
     }
-    memcpy(&k, &BufferReception[0x14], sizeof(float)); //Kd   
-     if (k < 0)
+    memcpy(&appeeramData.Kd, &BufferReception[0x14], sizeof(float)); //Kd   
+     if (appeeramData.Kd < 0)
     {
         return false;
     }
