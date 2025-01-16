@@ -336,6 +336,7 @@ void APPEERAM_Tasks ( void )
             }
             else
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 DRV_I2C_TransferEventHandlerSet(appeeramData.drvI2CHandle,APPEERAM_I2C_EventHandler,(uintptr_t)&appeeramData.transferStatus);/* Register the I2C Driver event Handler */
                 appeeramData.state  = APPEERAM_STATE_READ_BIT_ASE;
             }
@@ -353,6 +354,7 @@ void APPEERAM_Tasks ( void )
             }
             else
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 appeeramData.state = APPEERAM_STATE_ANALYZE_BIT_ASE;
             }
             break;
@@ -361,6 +363,7 @@ void APPEERAM_Tasks ( void )
         {
             if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_SUCCESS)
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 if (0x02 == (BufferReception[0x00] & 0x02))
                 {
                     appeeramData.adelay = RTC_Timer32CounterGet();
@@ -391,14 +394,16 @@ void APPEERAM_Tasks ( void )
             }
             else
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 appeeramData.state = APPEERAM_STATE_WAIT_WRITE_BIT_ASE;
             }
             break;
         }
         case APPEERAM_STATE_WAIT_WRITE_BIT_ASE:
         {
-             if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_SUCCESS)
+            if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_SUCCESS)
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 appeeramData.state = APPEERAM_STATE_WRITE_INITIAL_ADDRESS_READ;
                 appeeramData.adelay = RTC_Timer32CounterGet();
             }
@@ -424,6 +429,7 @@ void APPEERAM_Tasks ( void )
                 }
                 else
                 {
+                    appeeramData.typeOfError = I2C2_NO_ERROR;
                     appeeramData.state = APPEERAM_STATE_READ_ARRAY_EERAM;
                 }
             }
@@ -443,6 +449,7 @@ void APPEERAM_Tasks ( void )
                 }
                 else
                 {
+                    appeeramData.typeOfError = I2C2_NO_ERROR;
                     appeeramData.state = APPEERAM_STATE_INITIALIZE_CRC_READ;
                 }
             }
@@ -465,6 +472,7 @@ void APPEERAM_Tasks ( void )
             {
                 if((DSU_REGS->DSU_STATUSA & DSU_STATUSA_BERR_Msk) == 0U )
                 {
+                    appeeramData.typeOfError = I2C2_NO_ERROR;
                     uint32_t crcDeEERAM= (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x02] | (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x01] << 8));
                     if (crcDeEERAM == DSU_REGS->DSU_DATA)
                     {
@@ -544,6 +552,7 @@ void APPEERAM_Tasks ( void )
             }
             else
             {
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 appeeramData.state = APPEERAM_ESTADO_ESPERAR_TRANSFERENCIA_ARREGLO_EERAM; // vuelve para comprbar si se ha guardado correctamente el arreglo
             }
             break;
@@ -553,6 +562,7 @@ void APPEERAM_Tasks ( void )
             if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_SUCCESS)
             {
                 appeeramData.adelay = RTC_Timer32CounterGet();
+                appeeramData.typeOfError = I2C2_NO_ERROR;
                 appeeramData.state = APPEERAM_STATE_WRITE_INITIAL_ADDRESS_READ;
             }
             else if(appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_ERROR)
@@ -565,7 +575,33 @@ void APPEERAM_Tasks ( void )
         case APPEERAM_STATE_IDLE: break;
         case APPEERAM_STATE_ERROR:
         {
-            
+            switch(appeeramData.errorAPPEERAM)
+            {
+                case I2C2_OPEN_ERROR:
+                {
+                    appeeramData.adelay = RTC_Timer32CounterGet(); //I'll try again in 32ms
+                    appeeramData.state = APPEERAM_STATE_INIT;
+                    break;
+                }
+                case I2C2_COMPLETE_READ_TRANSFER_ASE_ERROR:  appeeramData.state  = APPEERAM_STATE_READ_BIT_ASE;      break;
+                case I2C2_ASSIGN_WRITE_HANDLER_ASE_ERROR:   
+                case I2C2_COMPLETE_WRITE_TRANSFER_ASE_ERROR: appeeramData.state = APPEERAM_STATE_ACTIVATE_BIT_ASE;   break; 
+                case I2C2_ASSIGN_WRITE_HANDLER_INITIAL_ADDRESS_ERROR:
+                case I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR:    
+                {
+                    appeeramData.adelay = RTC_Timer32CounterGet();
+                    appeeramData.state = APPEERAM_STATE_WRITE_INITIAL_ADDRESS_READ;
+                    break;
+                }
+                case I2C2_ASSIGN_WRITE_HANDLER_EERAM_ARRAY_ERROR: 
+                case I2C2_COMPLETE_WRITE_TRANSFER_EERAM_ARRAY_ERROR:    appeeramData.state = APPERRAM_STATE_STORE_BUFFER_EERAM; break;
+                default:  // I2C2_ASSIGN_READ_HANDLER_ASE_ERROR and any other errors should restart the task
+                {
+                    DRV_I2C_Close(DRV_I2C_INDEX_0);
+                    APPEERAM_Initialize(); //I restart the task
+                    break;
+                }
+            }
             break;
         }
         /* The default state should never be executed. */
