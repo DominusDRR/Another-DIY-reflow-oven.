@@ -12,4 +12,6 @@ The second PCB is the main board, where the microcontroller and the necessary pe
 
 ![image](https://github.com/user-attachments/assets/d94368a8-2afe-4349-91e9-9e6245b2cd4d)
 
+![image](https://github.com/user-attachments/assets/4d60f2f3-197c-45a6-84bf-4316afd82be6)
+
 
