@@ -29,7 +29,3 @@ The temperature should describe a curve over time similar to the one shown in th
 
 I have seen that the controller is of the PID type, and a microcontroller is generally used to carry out this control process, in addition to controlling and reading information from other devices.
 
-I'm using the wiki as a log to record the whole process.
-
-
-https://github.com/DominusDRR/Another-DIY-reflow-oven./wiki
