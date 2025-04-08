@@ -1,0 +1,12 @@
+# PCB Layout.
+
+I have decided to create 2 PCBs.
+
+The first is the one that goes into the rear terminal block of the box, here will be the voltage source, and tracks that will carry the electrical connection of the thermocouple and the control of the solid state relay.
+
+![image](https://github.com/user-attachments/assets/3f11512b-1b2e-4cd4-b3ef-bf23cae1972c)
+
+![image](https://github.com/user-attachments/assets/a1d7ac1f-9470-4a57-95cf-fd3a3ddc897b)
+
+The second PCB is the main board, where the microcontroller and the necessary peripherals will be.
+
