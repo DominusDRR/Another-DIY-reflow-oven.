@@ -10,3 +10,6 @@ The first is the one that goes into the rear terminal block of the box, here wil
 
 The second PCB is the main board, where the microcontroller and the necessary peripherals will be.
 
+![image](https://github.com/user-attachments/assets/d94368a8-2afe-4349-91e9-9e6245b2cd4d)
+
+
