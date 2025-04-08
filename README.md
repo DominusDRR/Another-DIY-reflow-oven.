@@ -1,6 +1,4 @@
 # Another DIY Reflow Oven
-
-# Another DIY Reflow Oven
 This repository contains information about the project I've named Another DIY Reflow Oven.
 
 ## [a. Introduction](Introduction.md)
