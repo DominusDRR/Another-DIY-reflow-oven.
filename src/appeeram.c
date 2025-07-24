@@ -47,7 +47,7 @@
 #define MAXIMUM_FLUX_ACTIVATION_TIME        120
 #define MINIMUM_FLUX_ACTIVATION_TIME        40
 
-#define MAXIMUM_REFLOW_TIME                 140
+#define MAXIMUM_REFLOW_TIME                 200
 #define MINIMUM_REFLOW_TIME                 50
 
 #define MAXIMUM_COOLING_TIME                170
@@ -60,7 +60,7 @@
 #define TEMPERATURE_POINT_B_Pb_FREE         200
 #define TIME_POINT_B_Pb_FREE                120 //180 - TIME_POINT_A_Pb_FREE 
 
-#define TEMPERATURE_POINT_C_Pb_FREE         255
+#define TEMPERATURE_POINT_C_Pb_FREE         250
 #define TIME_POINT_C_Pb_FREE                150
 
 #define TEMPERATURE_POINT_D_Pb_FREE         200
@@ -299,6 +299,7 @@ void APPEERAM_Initialize ( void )
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
+    PAC_PeripheralProtectSetup (PAC_PERIPHERAL_DSU, PAC_PROTECTION_CLEAR);
     initializeParametersI2C2();
 }
 
@@ -462,8 +463,16 @@ void APPEERAM_Tasks ( void )
         }
         case APPEERAM_STATE_INITIALIZE_CRC_READ:
         {
-            initializeCRC((void*)&BufferReception);
-            appeeramData.state = APPEERAM_STATE_WAIT_CRC_READ;
+            if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_SUCCESS)
+            {
+                initializeCRC((void*)&BufferReception);
+                appeeramData.state = APPEERAM_STATE_WAIT_CRC_READ;
+            }
+            else if (appeeramData.transferStatus == APPEERAM_TRANSFER_STATUS_ERROR)
+            {
+                appeeramData.typeOfError = I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR;
+                appeeramData.state = APPEERAM_STATE_ERROR;
+            }
             break;
         }
         case APPEERAM_STATE_WAIT_CRC_READ:
@@ -473,8 +482,13 @@ void APPEERAM_Tasks ( void )
                 if((DSU_REGS->DSU_STATUSA & DSU_STATUSA_BERR_Msk) == 0U )
                 {
                     appeeramData.typeOfError = I2C2_NO_ERROR;
-                    uint32_t crcDeEERAM= (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x02] | (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x01] << 8));
-                    if (crcDeEERAM == DSU_REGS->DSU_DATA)
+                    //uint32_t crcDeEERAM= (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x02] | (uint32_t)(BufferReception[APPEERAM_NUMBER_BYTE_READ -0x01] << 8));
+                    uint32_t crcEERAM =
+                            ((uint32_t)BufferReception[APPEERAM_NUMBER_BYTE_READ])          |
+                            ((uint32_t)BufferReception[APPEERAM_NUMBER_BYTE_READ + 1] << 8) |
+                            ((uint32_t)BufferReception[APPEERAM_NUMBER_BYTE_READ + 2] << 16)|
+                            ((uint32_t)BufferReception[APPEERAM_NUMBER_BYTE_READ + 3] << 24);
+                    if (crcEERAM == DSU_REGS->DSU_DATA)
                     {
                         appeeramData.state = appeeramData.stateWhereToJumpAfterCRC;
                     }
@@ -587,7 +601,7 @@ void APPEERAM_Tasks ( void )
                 case I2C2_ASSIGN_WRITE_HANDLER_ASE_ERROR:   
                 case I2C2_COMPLETE_WRITE_TRANSFER_ASE_ERROR: appeeramData.state = APPEERAM_STATE_ACTIVATE_BIT_ASE;   break; 
                 case I2C2_ASSIGN_WRITE_HANDLER_INITIAL_ADDRESS_ERROR:
-                case I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR:    
+                case I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR:
                 {
                     appeeramData.adelay = RTC_Timer32CounterGet();
                     appeeramData.state = APPEERAM_STATE_WRITE_INITIAL_ADDRESS_READ;
