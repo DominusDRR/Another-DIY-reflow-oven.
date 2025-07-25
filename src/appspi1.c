@@ -96,7 +96,7 @@ bool IsSPI1TaskIdle (void)
 /****************************************************************************/
 void LCDSend(unsigned char data, unsigned char cd)
 {
-    SS1_Clear();
+//    SS1_Clear();
     if (cd == SEND_CHR)
     {
         LCD_D_Set();
@@ -183,8 +183,17 @@ void APPSPI1_Tasks ( void )
             appspi1Data.drvSPIHandle = DRV_SPI_Open( DRV_SPI_INDEX_0, DRV_IO_INTENT_READWRITE );
             if(appspi1Data.drvSPIHandle != DRV_HANDLE_INVALID)
             {
-                appspi1Data.typeOfError = SPI1_NO_ERROR; //If it comes from APPSPI1_STATE_DELAY_TO_REOPEN_SPI state, it needs to be cleared
-                appspi1Data.state = APPSPI1_STATE_IDLE;
+                if(DRV_SPI_TransferSetup(appspi1Data.drvSPIHandle, &appspi1Data.setup) == true)
+                {
+                    DRV_SPI_TransferEventHandlerSet(appspi1Data.drvSPIHandle, SPI1Instance1EventHandler, (uintptr_t)0);
+                    appspi1Data.typeOfError = SPI1_NO_ERROR; //If it comes from APPSPI1_STATE_DELAY_TO_REOPEN_SPI state, it needs to be cleared
+                    appspi1Data.state = APPSPI1_STATE_IDLE;
+                }
+                else
+                {
+                    appspi1Data.typeOfError = SPI1_SET_INSTANCE;
+                    appspi1Data.state = APPSPI1_STATE_ERROR;
+                }
             }
             else
             {
@@ -197,6 +206,7 @@ void APPSPI1_Tasks ( void )
         case APPSPI1_STATE_IDLE: break; // It waits until another process wants to write or read information on the SPI bus.
         case APPSPI1_START_TRANSMISSION:
         {
+            SS1_Clear();
             DRV_SPI_TransferEventHandlerSet(appspi1Data.drvSPIHandle, SPI1Instance1EventHandler, (uintptr_t)0);
             appspi1Data.state = APPSPI1_TRANSMISSION;
             break;
@@ -231,6 +241,7 @@ void APPSPI1_Tasks ( void )
             switch(appspi1Data.typeOfError)
             {
                 case SPI1_OPEN_ERROR:
+                case SPI1_SET_INSTANCE:    
                 {
                     appspi1Data.adelay = RTC_Timer32CounterGet();
                     appspi1Data.state = APPSPI1_STATE_DELAY_TO_REOPEN_SPI;
