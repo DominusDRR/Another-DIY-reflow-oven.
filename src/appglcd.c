@@ -119,10 +119,25 @@ extern void LCDSend(unsigned char data, unsigned char cd);
 // *****************************************************************************
 
 bool IsGLCDTaskIdle (void);
+void LCDClear(void);
 void LCDPixelXY(uint32_t x, uint32_t y);
 void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+void drawInitialLogo(void);
 /* TODO:  Add any necessary local functions.
 */
+/****************************************************************************/
+/*  It is used to clear the screen before drawing something.                */                                             
+/*  Function : LCDClear                                                     */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDClear (void)
+{
+    appglcdData.stateToReturn = APPGLCD_STATE_IDLE; //And after the update, it should go into idel state until another task asks it to plot something.
+    appglcdData.state = APPGLCD_STATE_START_CLEANING_GLCD;
+}
+
 /****************************************************************************/
 /*  Determines whether the GLCD module task is idle so it can send or receive 
  *  data */                                                             
@@ -195,7 +210,22 @@ void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2) //draw a line
     appglcdData.pointerX2 = x2;
     appglcdData.pointerY2 = y2;
     appglcdData.state = APPGLCD_STATE_GRAPH_LINE;
-    appglcdData.stateToReturn = APPGLCD_STATE_GRAPH_LINE;
+}
+/****************************************************************************/
+/*  Graphically represents Sicoy's initial logo.                                                            */
+/*  Function : drawInitialLogo                                              */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void drawInitialLogo(void)
+{
+    appglcdData.pointerX1 = 0;
+    appglcdData.pointerY1 = 0;
+    appglcdData.col = 0;
+    appglcdData.row = 0;
+    appglcdData.logoSample = logoSicoy[0];
+    appglcdData.state = APPGLCD_STATE_START_DRAW_LOGO;
 }
 
 // *****************************************************************************
@@ -254,12 +284,12 @@ void APPGLCD_Tasks ( void )
             if ( abs_diff_uint32(RTC_Timer32CounterGet(), appglcdData.adelay) > _1000ms)
             {
                 appglcdData.pointerX1 = 0x00;
-                appglcdData.state = APPGLCD_STATE_LCD_COMMANDS;
+                appglcdData.state = APPGLCD_STATE_LCD_CONFIGURATION_COMMANDS;
             }
             break;
         }
         /* TODO: implement your application state machine.*/
-        case APPGLCD_STATE_LCD_COMMANDS:
+        case APPGLCD_STATE_LCD_CONFIGURATION_COMMANDS:
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
             {
@@ -272,6 +302,7 @@ void APPGLCD_Tasks ( void )
             }
             break;
         }
+         /*** LCD clear and update process ***/
         case APPGLCD_STATE_START_CLEANING_GLCD:
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
@@ -295,6 +326,7 @@ void APPGLCD_Tasks ( void )
             }
             break;
         }
+        /*** LCD update process ***/
         case APPGLCD_STATE_START_GLCD_UPDATE:
         {
             if (IsSPI1TaskIdle ()) //I wait until the SERCOM1 task is idle
@@ -306,9 +338,7 @@ void APPGLCD_Tasks ( void )
                 }
                 else
                 {
-                 
-                    
-                    appglcdData.state = appglcdData.stateToReturn;
+                    appglcdData.state = appglcdData.stateToReturn; //Here it returns to another state, so when the update process is called, this variable must have the next state
                 }
             }
             break;
@@ -340,6 +370,8 @@ void APPGLCD_Tasks ( void )
             }
             break;
         }
+        /*** End of update process code ****/
+        /*** LCD contrast calibration start ***/
         case APPGLCD_STATE_START_CONTRAST:
         {
             if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
@@ -363,47 +395,13 @@ void APPGLCD_Tasks ( void )
             if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
             {
                 LCDSend(0x20, SEND_CMD);
-                appglcdData.pointerX1 = 0x00;
-                appglcdData.state = APPGLCD_STATE_CLEAR_LCD; //You must clean the screen again and update it
-                appglcdData.stateToReturn = APPGLCD_STATE_START_GRAPH_LINE; //Temporary is for testing, you must go to rest
-                
-                
-                
+                appglcdData.state = APPGLCD_STATE_START_CLEANING_GLCD; //Once the contrast is set, the LCD must be updtae
+                appglcdData.stateToReturn = APPGLCD_STATE_IDLE; //And after the update, it should go into idel state until another task asks it to plot something.
             }
             break;
         }
+        /*** End of LCD contrast calibration code ***/
         case APPGLCD_STATE_IDLE: break;
-        case APPGLCD_STATE_START_GRAPH_LINE:
-        {
-            appglcdData.pointerX1 = 0;
-            appglcdData.pointerX2 = 10;
-            
-            appglcdData.pointerY1 = 50;
-            appglcdData.pointerY2 = 40;
-
-            
-            appglcdData.dx = abs (appglcdData.pointerX2-appglcdData.pointerX1);
-            appglcdData.dy = abs (appglcdData.pointerY2-appglcdData.pointerY1);
-            if (appglcdData.pointerX1 < appglcdData.pointerX2) 
-            {
-                appglcdData.sx = 1;
-            }
-            else
-            {
-                appglcdData.sx = -1;
-            }
-            if (appglcdData.pointerY1 < appglcdData.pointerY2) 
-            {
-                appglcdData.sy = 1;
-            }
-            else 
-            {
-                appglcdData.sy = -1;
-            }
-            appglcdData.error1 = appglcdData.dx - appglcdData.dy;
-            appglcdData.state = APPGLCD_STATE_GRAPH_LINE;
-            break;
-        }
         case APPGLCD_STATE_GRAPH_LINE:
         {
             if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
@@ -436,34 +434,21 @@ void APPGLCD_Tasks ( void )
             {
                 appglcdData.pointerY1 = 0x00;
                 appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
-                /*******************************/
-                appglcdData.stateToReturn = APPGLCD_STATE_START_DRAW_LOGO;
-                /************/
-                //appglcdData.stateToReturn = APPGLCD_STATE_IDLE; //Once you update the LCD, it should return to idle state.
+                appglcdData.stateToReturn = APPGLCD_STATE_IDLE; //Once you update the LCD, it should return to idle state.
             }
             break;
         }
         case APPGLCD_STATE_START_DRAW_LOGO:
         {
-             appglcdData.pointerX1 = 0;
-            appglcdData.pointerY1 = 0;
-            appglcdData.col = 0;
-            appglcdData.row = 0;
-            appglcdData.muestraLogo = logoSicoy[0];
-            appglcdData.state = APPGLCD_STATE_xxxx;
-            break;
-        }
-        case APPGLCD_STATE_xxxx:    
-        {
            if (IsSPI1TaskIdle()) //I wait until the SERCOM1 task is idle
            {
                 if (appglcdData.pointerY1 < 0x08)
                 {
-                    if (appglcdData.muestraLogo & 0x80) 
+                    if (appglcdData.logoSample & 0x80) 
                     {
                         LCDPixelXY(appglcdData.col + appglcdData.pointerY1, appglcdData.row);
                     }
-                    appglcdData.muestraLogo <<= 1;
+                    appglcdData.logoSample <<= 1;
                     appglcdData.pointerY1++;
                 }
                 else
@@ -486,13 +471,13 @@ void APPGLCD_Tasks ( void )
                 if (appglcdData.pointerX1 < sizeof(logoSicoy))
                 {
                     appglcdData.pointerX1++;
-                    appglcdData.muestraLogo = logoSicoy[appglcdData.pointerX1];
+                    appglcdData.logoSample = logoSicoy[appglcdData.pointerX1];
                     appglcdData.pointerY1 = 0;
-                    appglcdData.state = APPGLCD_STATE_xxxx;
+                    appglcdData.state = APPGLCD_STATE_START_DRAW_LOGO;
                 }
                 else
                 {
-                     appglcdData.pointerY1 = 0x00;
+                    appglcdData.pointerY1 = 0x00;
                     appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
                     appglcdData.stateToReturn = APPGLCD_STATE_IDLE; 
                 }
