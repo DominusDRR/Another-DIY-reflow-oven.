@@ -54,10 +54,11 @@ extern "C" {
 #define I2C2_COMPLETE_WRITE_TRANSFER_ASE_ERROR                      0x05
 #define I2C2_ASSIGN_WRITE_HANDLER_INITIAL_ADDRESS_ERROR             0x06
 #define I2C2_COMPLETE_WRITE_TRANSFER_INITIAL_ADDRESS_ERROR          0x07
-#define I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR                  0x08  
-#define I2C2_EERAM_ILLOLOGICAL_DATA_ERROR                           0x09    
-#define I2C2_ASSIGN_WRITE_HANDLER_EERAM_ARRAY_ERROR                 0x0A
-#define I2C2_COMPLETE_WRITE_TRANSFER_EERAM_ARRAY_ERROR              0x0B
+#define I2C2_READING_EERAM_ARRANGEMENT                              0x08    
+#define I2C2_ASSIGN_READ_HANDLER_EERAM_ARRAY_ERROR                  0x09  
+#define I2C2_EERAM_ILLOLOGICAL_DATA_ERROR                           0x0A    
+#define I2C2_ASSIGN_WRITE_HANDLER_EERAM_ARRAY_ERROR                 0x0B
+#define I2C2_COMPLETE_WRITE_TRANSFER_EERAM_ARRAY_ERROR              0x0C
     
     
     
