@@ -28,7 +28,7 @@
 // *****************************************************************************
 
 #include "apphmi.h"
-
+#include "definitions.h"
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -58,7 +58,11 @@ APPHMI_DATA apphmiData;
 // *****************************************************************************
 // *****************************************************************************
 extern bool IsGLCDTaskIdle (void);
+extern void LCDClear(void);
 extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv);
+extern void drawInitialLogo(void);
+extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 /* TODO:  Add any necessary callback functions.
 */
 
@@ -119,14 +123,36 @@ void APPHMI_Tasks ( void )
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
-                apphmiData.state = APPHMI_STATE_SERVICE_TASKS;
-                LCDLine (1, 1, 30, 30); // This test consists of drawing a line in the GLCD to verify the operation of the created libraries.
+                drawInitialLogo();
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.state = APPHMI_STATE_WAIT_DELAY_FOR_LOGO;
             }
             break;
         }
-        case APPHMI_STATE_SERVICE_TASKS:
+        case APPHMI_STATE_WAIT_DELAY_FOR_LOGO:
         {
-
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _2000ms)
+            {
+                apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+            }
+            break;
+        }
+        case APPHMI_STATE_CLEAR_LCD:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDClear();
+                apphmiData.state = APPHMI_STATE_DRAW_LINE;
+            }
+            break;
+        }
+        case APPHMI_STATE_DRAW_LINE:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                apphmiData.state++;
+                LCDStr(1, (unsigned char *) "Hola Lyzetta!", true);//LCDLine (1, 1, 30, 30); // This test consists of drawing a line in the GLCD to verify the operation of the created libraries.
+            }
             break;
         }
         /* TODO: implement your application state machine.*/
