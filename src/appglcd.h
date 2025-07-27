@@ -74,15 +74,22 @@ typedef enum
     APPGLCD_STATE_INIT=0,
     APPGLCD_STATE_WAIT_1000ms,
     /* TODO: Define states used by the application state machine. */
-    APPGLCD_STATE_LCD_COMMANDS,
+    APPGLCD_STATE_LCD_CONFIGURATION_COMMANDS,
     APPGLCD_STATE_START_CLEANING_GLCD,
     APPGLCD_STATE_CLEAR_LCD,
     APPGLCD_STATE_START_GLCD_UPDATE,
     APPGLCD_STATE_WRITE_Y_COORDINATES,
     APPGLCD_STATE_WRITE_X_COORDINATES,
+    APPGLCD_STATE_START_CONTRAST,
+    APPGLCD_STATE_SET_LCD_VOP,      
+    APPGLCD_STATE_HORIZONTAL_ADDRESSING_MODE,        
     APPGLCD_STATE_IDLE,
     APPGLCD_STATE_GRAPH_LINE,
-    APPGLCD_STATE_WAIT_PROCESS_COMPLETION_GLCD        
+    APPGLCD_STATE_WAIT_PROCESS_COMPLETION_GLCD,
+    APPGLCD_STATE_START_DRAW_LOGO,
+    APPGLCD_STATE_DRAW_LOGO,
+    APPGLCD_STATE_START_WRITE_MESSAGE_ROW,
+    APPGLCD_STATE_WRITE_MESSAGE_ROW        
 } APPGLCD_STATES;
 
 
@@ -105,14 +112,23 @@ typedef struct
     APPGLCD_STATES state;
     /* TODO: Define any additional data used by the application. */
     uint32_t adelay;
-    size_t pointerX1;
-    size_t pointerY1;
-    size_t pointerX2;
-    size_t pointerY2;
-    size_t error1;
-    size_t error2;
-    int32_t dx, dy, sx, sy;
+    int32_t pointerX1;
+    int32_t pointerY1;
+    int32_t pointerX2;
+    int32_t pointerY2;
+    int32_t dx;
+    int32_t dy;
+    int32_t error1;
+    int32_t error2;
+    int32_t sx;
+    int32_t sy;
+    uint8_t logoSample;
+    uint16_t col;
+    uint16_t row;
     uint8_t LcdMemory[LCD_CACHE_SIZE];
+    int8_t xMessage;
+    uint8_t *dataPtr;
+    bool inv;
     APPGLCD_STATES stateToReturn;
 } APPGLCD_DATA;
 
