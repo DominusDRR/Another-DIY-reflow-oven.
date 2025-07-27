@@ -62,8 +62,10 @@ typedef enum
 {
     /* Application's state machine's initial state. */
     APPHMI_STATE_INIT=0,
-    APPHMI_STATE_SERVICE_TASKS,
+    APPHMI_STATE_WAIT_DELAY_FOR_LOGO,
     /* TODO: Define states used by the application state machine. */
+    APPHMI_STATE_CLEAR_LCD,        
+    APPHMI_STATE_DRAW_LINE   
 
 } APPHMI_STATES;
 
@@ -85,9 +87,8 @@ typedef struct
 {
     /* The application's current state */
     APPHMI_STATES state;
-
     /* TODO: Define any additional data used by the application. */
-
+    uint32_t adelay;
 } APPHMI_DATA;
 
 // *****************************************************************************
