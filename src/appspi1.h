@@ -49,8 +49,9 @@ extern "C" {
 // *****************************************************************************
 #define  SPI1_NO_ERROR       0x00
 #define  SPI1_OPEN_ERROR     0x01
-#define  SPI1_TRANSMISSION   0x02       
-#define  SPI1_HANLDER_ERROR  0x03  
+#define  SPI1_SET_INSTANCE   0x02    
+#define  SPI1_TRANSMISSION   0x03       
+#define  SPI1_HANLDER_ERROR  0x04  
 // *****************************************************************************
 /* Application states
 
