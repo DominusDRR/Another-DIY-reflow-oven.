@@ -129,6 +129,7 @@ typedef struct
     int8_t xMessage;
     uint8_t *dataPtr;
     bool inv;
+    bool updateLCD;
     APPGLCD_STATES stateToReturn;
 } APPGLCD_DATA;
 
