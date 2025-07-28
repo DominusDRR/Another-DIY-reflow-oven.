@@ -52,20 +52,30 @@
 
 APPHMI_DATA apphmiData;
 
+const unsigned char *msgsHomeMenu[] = 
+{
+    (unsigned char *)" CHOOSE OPTION", // max 14 chars
+    (unsigned char *)" ", 
+    (unsigned char *)"Start process",
+    (unsigned char *)"Set Parameters",
+    (unsigned char *)"Current Temp"
+};
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
 // *****************************************************************************
 // *****************************************************************************
-extern bool IsGLCDTaskIdle (void);
-extern void LCDClear(void);
-extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
-extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv);
-extern void drawInitialLogo(void);
-extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 /* TODO:  Add any necessary callback functions.
 */
-
+extern bool IsGLCDTaskIdle (void);
+extern void LCDClear(void);
+extern void LCDUpdate(void);
+extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD);
+extern void drawInitialLogo(void);
+extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
+extern uint8_t getPressedBtn(void);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -133,6 +143,7 @@ void APPHMI_Tasks ( void )
         {
             if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _2000ms)
             {
+                apphmiData.selectedOption = 0x02;
                 apphmiData.state = APPHMI_STATE_CLEAR_LCD;
             }
             break;
@@ -142,20 +153,76 @@ void APPHMI_Tasks ( void )
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
                 LCDClear();
-                apphmiData.state = APPHMI_STATE_DRAW_LINE;
+                apphmiData.messagePointer = 0x00;
+                apphmiData.state = APPHMI_STATE_DRAW_HOME_MENU;
             }
             break;
         }
-        case APPHMI_STATE_DRAW_LINE:
+        case APPHMI_STATE_DRAW_HOME_MENU:
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
-                apphmiData.state++;
-                LCDStr(1, (unsigned char *) "Hola Lyzetta!", true);//LCDLine (1, 1, 30, 30); // This test consists of drawing a line in the GLCD to verify the operation of the created libraries.
+                if (apphmiData.messagePointer < 0x05)
+                {
+                    LCDStr(apphmiData.messagePointer, msgsHomeMenu[apphmiData.messagePointer], (apphmiData.selectedOption == apphmiData.messagePointer), false);
+                    apphmiData.messagePointer++;
+                }
+                else
+                {
+                    apphmiData.state = APPHMI_STATE_UPDATE_HOME_MENU;
+                }
             }
             break;
         }
         /* TODO: implement your application state machine.*/
+        case APPHMI_STATE_UPDATE_HOME_MENU:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDUpdate();
+                apphmiData.state = APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU;
+            }
+            break;
+        }
+        case APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU:
+        {
+            uint8_t button = getPressedBtn();
+            if (NO_BUTTON_PRESSED != button)
+            {
+                switch (button)
+                {
+                    case OK_BUTTON_PRESSED:
+                    {
+                        
+                        break;
+                    }
+                    case UP_BUTTON_PRESSED:
+                    case DOWN_BUTTON_PRESSED:
+                    {
+                        if (button == UP_BUTTON_PRESSED)
+                        {
+                            apphmiData.selectedOption--;
+                            if (apphmiData.selectedOption < 2)
+                            {
+                                apphmiData.selectedOption = 4;
+                            }
+                        }
+                        else // DOWN
+                        {
+                            apphmiData.selectedOption++;
+                            if (apphmiData.selectedOption > 4)
+                            {
+                                apphmiData.selectedOption = 2;
+                            }
+                        }
+                        apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+                        break;
+                    }
+                    default: break; // case ESC
+                }
+            }
+            break;
+        }
         /* The default state should never be executed. */
         default: break; /* TODO: Handle error in application's state machine. */
     }
