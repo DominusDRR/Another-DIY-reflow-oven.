@@ -65,8 +65,9 @@ typedef enum
     APPHMI_STATE_WAIT_DELAY_FOR_LOGO,
     /* TODO: Define states used by the application state machine. */
     APPHMI_STATE_CLEAR_LCD,        
-    APPHMI_STATE_DRAW_LINE   
-
+    APPHMI_STATE_DRAW_HOME_MENU,   
+    APPHMI_STATE_UPDATE_HOME_MENU,
+    APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU
 } APPHMI_STATES;
 
 
@@ -88,6 +89,8 @@ typedef struct
     /* The application's current state */
     APPHMI_STATES state;
     /* TODO: Define any additional data used by the application. */
+    uint8_t messagePointer;
+    uint8_t selectedOption;
     uint32_t adelay;
 } APPHMI_DATA;
 
