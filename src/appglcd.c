@@ -218,9 +218,10 @@ extern void LCDSend(unsigned char data, unsigned char cd);
 
 bool IsGLCDTaskIdle (void);
 void LCDClear(void);
+void LCDUpdate(void);
 void LCDPixelXY(uint32_t x, uint32_t y);
 void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
-void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv);
+void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD);
 void drawInitialLogo(void);
 /* TODO:  Add any necessary local functions.
 */
@@ -236,7 +237,20 @@ void LCDClear (void)
     appglcdData.stateToReturn = APPGLCD_STATE_IDLE; //And after the update, it should go into idel state until another task asks it to plot something.
     appglcdData.state = APPGLCD_STATE_START_CLEANING_GLCD;
 }
-
+/****************************************************************************/
+/*  It is used to update the screen before drawing something.               */                                             
+/*  Function : LCDUpdaate                                                   */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDUpdate(void)
+{
+    appglcdData.pointerY1 = 0x00;
+    appglcdData.updateLCD = false;
+    appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
+    appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
+}
 /****************************************************************************/
 /*  Determines whether the GLCD module task is idle so it can send or receive 
  *  data */                                                             
@@ -318,12 +332,13 @@ void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2) //draw a line
 /* inverted, inv must be different from zero                                */
 /*  Output  :  Nothing                                                      */
 /****************************************************************************/
-void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv)
+void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD)
 {
     appglcdData.xMessage = 0x00;
     appglcdData.row = (uint16_t)row;
     appglcdData.dataPtr = (uint8_t*)dataPtr;
     appglcdData.inv = inv;
+    appglcdData.updateLCD = updateLCD;
     appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_ROW;
 }
 /****************************************************************************/
@@ -616,8 +631,15 @@ void APPGLCD_Tasks ( void )
                 else
                 {
                     appglcdData.pointerY1 = 0x00;
-                    appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
-                    appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
+                    if (appglcdData.updateLCD)
+                    {
+                        appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
+                        appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
+                    }
+                    else
+                    {
+                        appglcdData.state = APPGLCD_STATE_IDLE;
+                    }
                 }
             }
             break;
