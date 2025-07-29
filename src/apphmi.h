@@ -67,7 +67,9 @@ typedef enum
     APPHMI_STATE_CLEAR_LCD,        
     APPHMI_STATE_DRAW_HOME_MENU,   
     APPHMI_STATE_UPDATE_HOME_MENU,
-    APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU
+    APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU,
+    APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE,        
+    APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS        
 } APPHMI_STATES;
 
 
@@ -91,6 +93,7 @@ typedef struct
     /* TODO: Define any additional data used by the application. */
     uint8_t messagePointer;
     uint8_t selectedOption;
+    uint8_t typeErrorThermocuple;
     uint32_t adelay;
 } APPHMI_DATA;
 
