@@ -81,6 +81,7 @@ static const ButtonMap_t buttonMap[] =
 /* TODO:  Add any necessary callback functions.
 */
 extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
+extern void buttonPressedSound(void);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -165,6 +166,7 @@ void APPSWITCHES_Tasks ( void )
                 {
                     appswitchesData.buttonPressed = buttonMap[appswitchesData.buttonPointer].code;
                     appswitchesData.adelay = RTC_Timer32CounterGet();
+                    buttonPressedSound();
                     appswitchesData.state = APPSWITCHES_STATE_ELIMINATE_BOUNCE;
                     return;
                 }
