@@ -76,6 +76,9 @@ extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD
 extern void drawInitialLogo(void);
 extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 extern uint8_t getPressedBtn(void);
+
+extern uint8_t getTypeThermocoupleError(void);
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -105,12 +108,10 @@ void APPHMI_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
     apphmiData.state = APPHMI_STATE_INIT;
-
-
-
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
+    apphmiData.typeErrorThermocuple = 0xFF; //This way I force the thermocouple status to update for the first time.
 }
 
 
@@ -193,7 +194,10 @@ void APPHMI_Tasks ( void )
                 {
                     case OK_BUTTON_PRESSED:
                     {
-                        
+                        if (0x04 == apphmiData.selectedOption)
+                        {
+                            apphmiData.state = APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE;
+                        }
                         break;
                     }
                     case UP_BUTTON_PRESSED:
@@ -223,6 +227,43 @@ void APPHMI_Tasks ( void )
             }
             break;
         }
+        /*** Current temperature display ***/
+        case APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                if (apphmiData.typeErrorThermocuple != getTypeThermocoupleError())
+                {
+                    apphmiData.typeErrorThermocuple = getTypeThermocoupleError();
+                    LCDClear();
+                    apphmiData.state = APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS;
+                    return; //So that the if below is not executed
+                }
+                if (ESC_BUTTON_PRESSED == getPressedBtn()) // Return to the HOME menu
+                {
+                    apphmiData.typeErrorThermocuple = 0xFF; 
+                    apphmiData.selectedOption = 0x02;
+                    apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+                }
+            }
+            break;
+        }
+        case APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                switch (apphmiData.typeErrorThermocuple)
+                {
+                    case OPEN_THERMOCOUPLE:     LCDStr(0x02,(unsigned char *)"Thermocouple  open",false, true); break;
+                    case SHORT_CIRCUIT_TO_GND:  LCDStr(0x02,(unsigned char *)"Thermocouple  to GNC",false, true); break;
+                    case SHORT_CIRCUIT_TO_VCC:  LCDStr(0x02,(unsigned char *)"Thermocouple  to Vcc",false, true); break;
+                    default: break;
+                }
+                apphmiData.state = APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE;
+            }
+            break;
+        }
+        /*****************************************************************************************************************/
         /* The default state should never be executed. */
         default: break; /* TODO: Handle error in application's state machine. */
     }
