@@ -29,6 +29,9 @@
 
 #include "apphmi.h"
 #include "definitions.h"
+#include <stdio.h>
+//#include <stdint.h>
+//#include <stdbool.h>
 // *****************************************************************************
 // *****************************************************************************
 // Section: Global Data Definitions
@@ -78,7 +81,10 @@ extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 extern uint8_t getPressedBtn(void);
 
 extern uint8_t getTypeThermocoupleError(void);
-
+extern float getThermocoupleTemp(void);
+extern float getInternalTemp(void);
+extern bool IsMaxTaskIdle (void);
+extern void startTemperatureReading(void);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -112,6 +118,7 @@ void APPHMI_Initialize ( void )
      * parameters.
      */
     apphmiData.typeErrorThermocuple = 0xFF; //This way I force the thermocouple status to update for the first time.
+    apphmiData.doNotClearLCD = false;
 }
 
 
@@ -196,7 +203,8 @@ void APPHMI_Tasks ( void )
                     {
                         if (0x04 == apphmiData.selectedOption)
                         {
-                            apphmiData.state = APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE;
+                            apphmiData.adelay = RTC_Timer32CounterGet();
+                            apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING;
                         }
                         break;
                     }
@@ -228,6 +236,37 @@ void APPHMI_Tasks ( void )
             break;
         }
         /*** Current temperature display ***/
+        case APPHMI_STATE_REQUEST_START_TEMPERATURE_READING:
+        {
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _500ms)
+            {
+                if (IsMaxTaskIdle())
+                {
+                    startTemperatureReading();
+                    apphmiData.state = APPHMI_STATE_WAIT_TEMPERATURE_READING;
+                }
+                else
+                {
+                    apphmiData.adelay = RTC_Timer32CounterGet();
+                }
+            }
+            if (ESC_BUTTON_PRESSED == getPressedBtn()) // Return to the HOME menu
+            {
+                apphmiData.typeErrorThermocuple = 0xFF; 
+                apphmiData.selectedOption = 0x02;
+                apphmiData.doNotClearLCD = false; //This flag can be set to true, so it is cleared for the proxy.
+                apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_TEMPERATURE_READING:
+        {
+            if (IsMaxTaskIdle())
+            {
+                apphmiData.state = APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE;
+            }
+            break;
+        }
         case APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE:
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
@@ -235,16 +274,19 @@ void APPHMI_Tasks ( void )
                 if (apphmiData.typeErrorThermocuple != getTypeThermocoupleError())
                 {
                     apphmiData.typeErrorThermocuple = getTypeThermocoupleError();
-                    LCDClear();
+                    if (apphmiData.doNotClearLCD)
+                    {
+                        apphmiData.doNotClearLCD = false;
+                    }
+                    else
+                    {
+                        LCDClear();
+                    }
                     apphmiData.state = APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS;
                     return; //So that the if below is not executed
                 }
-                if (ESC_BUTTON_PRESSED == getPressedBtn()) // Return to the HOME menu
-                {
-                    apphmiData.typeErrorThermocuple = 0xFF; 
-                    apphmiData.selectedOption = 0x02;
-                    apphmiData.state = APPHMI_STATE_CLEAR_LCD;
-                }
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING;
             }
             break;
         }
@@ -257,9 +299,58 @@ void APPHMI_Tasks ( void )
                     case OPEN_THERMOCOUPLE:     LCDStr(0x02,(unsigned char *)"Thermocouple  open",false, true); break;
                     case SHORT_CIRCUIT_TO_GND:  LCDStr(0x02,(unsigned char *)"Thermocouple  to GNC",false, true); break;
                     case SHORT_CIRCUIT_TO_VCC:  LCDStr(0x02,(unsigned char *)"Thermocouple  to Vcc",false, true); break;
-                    default: break;
+                    default: apphmiData.state = APPHMI_STATE_GET_THERMOCUPLE_TEMPERATUE; return;
                 }
-                apphmiData.state = APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE;
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING;
+            }
+            break;
+        }
+        case APPHMI_STATE_GET_THERMOCUPLE_TEMPERATUE://Split into several states, so that the task does not completely take over the CPU
+        {
+            apphmiData.thermocoupleTemp = getThermocoupleTemp();
+            apphmiData.state = APPHMI_STATE_GET_INTERNAL_TEMPERATUE;
+            break;
+        }
+        case APPHMI_STATE_GET_INTERNAL_TEMPERATUE:
+        {
+            apphmiData.internalTemp = getInternalTemp();
+            apphmiData.state = APPHMI_STATE_WRITE_CURRENT_TEMPERATURE;
+            break;
+        }
+        case APPHMI_STATE_WRITE_CURRENT_TEMPERATURE:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                //static char buf1[40];
+                LCDStr(0, (uint8_t*)"Thermocuple   Temp       ", false, false);
+                LCDStr(3, (uint8_t*)"Internal      Temp       ", false, false);//I clean the information from the LCD
+                snprintf(apphmiData.bufferForStrings, sizeof(apphmiData.bufferForStrings),"Thermocuple   Temp %.1f C", apphmiData.thermocoupleTemp);
+                LCDStr(0, (uint8_t*)apphmiData.bufferForStrings, false, false);
+                apphmiData.state = APPHMI_STATE_WRITE_INTERNAL_TEMPERATURE;
+            }
+            break;
+        }
+        case APPHMI_STATE_WRITE_INTERNAL_TEMPERATURE:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                //static char buf2[30];
+                snprintf(apphmiData.bufferForStrings, sizeof(apphmiData.bufferForStrings),"Internal      Temp %.1f C", apphmiData.internalTemp);
+                LCDStr(3, (uint8_t*)apphmiData.bufferForStrings, false, false);
+                apphmiData.state = APPHMI_STATE_UPDATE_TEMPERATURES;
+            }
+            break;
+        }
+        case APPHMI_STATE_UPDATE_TEMPERATURES:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDUpdate();
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.typeErrorThermocuple = 0xFF; //I do this so that another temperature
+                apphmiData.doNotClearLCD = true; //I prevent the screen from being cleaned, it produces a flickering and does not look natural.
+                apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING; 
             }
             break;
         }
