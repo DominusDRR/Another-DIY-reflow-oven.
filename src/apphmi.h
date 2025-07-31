@@ -68,8 +68,15 @@ typedef enum
     APPHMI_STATE_DRAW_HOME_MENU,   
     APPHMI_STATE_UPDATE_HOME_MENU,
     APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU,
+    APPHMI_STATE_REQUEST_START_TEMPERATURE_READING,
+    APPHMI_STATE_WAIT_TEMPERATURE_READING,
     APPHMI_STATE_START_WRITE_CURRENT_TEMPERATURE,        
-    APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS        
+    APPHMI_STATE_DISPLAY_THERMOCOUPLE_ERRORS,
+    APPHMI_STATE_GET_THERMOCUPLE_TEMPERATUE,   
+    APPHMI_STATE_GET_INTERNAL_TEMPERATUE,        
+    APPHMI_STATE_WRITE_CURRENT_TEMPERATURE,
+    APPHMI_STATE_WRITE_INTERNAL_TEMPERATURE,
+    APPHMI_STATE_UPDATE_TEMPERATURES        
 } APPHMI_STATES;
 
 
@@ -95,6 +102,10 @@ typedef struct
     uint8_t selectedOption;
     uint8_t typeErrorThermocuple;
     uint32_t adelay;
+    float thermocoupleTemp;
+    float internalTemp;
+    char bufferForStrings[40];
+    bool doNotClearLCD;
 } APPHMI_DATA;
 
 // *****************************************************************************
