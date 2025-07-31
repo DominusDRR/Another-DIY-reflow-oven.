@@ -69,6 +69,10 @@ extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 // *****************************************************************************
 static void SPI0Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRANSFER_HANDLE transferHandle, uintptr_t context);
 uint8_t decodeThermocoupleError(uint8_t rawByte);
+float getThermocoupleTemp(void);
+float getInternalTemp(void);
+bool IsMaxTaskIdle (void);
+void startTemperatureReading(void);
 /* TODO:  Add any necessary local functions.
 */
 static void SPI0Instance1EventHandler (DRV_SPI_TRANSFER_EVENT event, DRV_SPI_TRANSFER_HANDLE transferHandle, uintptr_t context)
@@ -89,7 +93,7 @@ uint8_t decodeThermocoupleError(uint8_t rawByte)
     uint8_t err = rawByte & 0x07;
     if (err & 0x01) return OPEN_THERMOCOUPLE;
     if (err & 0x02) return SHORT_CIRCUIT_TO_GND;
-    if (err & 0x04)  return SHORT_CIRCUIT_TO_VCC;
+    if (err & 0x04) return SHORT_CIRCUIT_TO_VCC;
     return NO_ERROR_THERMOCOUPLE;
 }
 uint8_t getTypeThermocoupleError(void)
@@ -97,6 +101,45 @@ uint8_t getTypeThermocoupleError(void)
     return appmaxData.typeThermocoupleError;
 }
 
+float getThermocoupleTemp(void)
+{
+    int16_t raw14 = ((int16_t)appmaxData.bufferRX[0] << 8 | appmaxData.bufferRX[1]) >> 2;
+    // Si era negativo (bit13 = 1), extiende signo a 16 bits:
+    if (raw14 & (1 << 13))
+    {
+        raw14 |= 0xC000;  // 1100 0000 0000 0000
+    }
+    // Resolución 0.25 °C por LSB
+    return raw14 * 0.25f;
+}
+float getInternalTemp(void)
+{
+    // bufferRX[2] trae bits [15:8], bufferRX[3] trae [7:0].
+    // Queremos bits [15:4] ? 12 bits en raw12[11:0].
+    //   - Desplazamos bufferRX[2] << 4: bit7?bit11 ... bit0?bit4
+    //   - Desplazamos bufferRX[3] >> 4: bit4?bit0 ... bit7?bit3 (estos bits superiores se descartan)
+    int16_t raw12 = ((int16_t)appmaxData.bufferRX[2] << 4) | ( appmaxData.bufferRX[3] >> 4 );
+
+    // Extiende signo si el bit11 está a 1
+    if (raw12 & (1 << 11))
+    {
+        raw12 |= 0xF000;  // 1111 xxxx xxxx xxxx
+    }
+    // Resolución de 0.0625 °C por LSB
+    return raw12 * 0.0625f;
+}
+bool IsMaxTaskIdle (void)
+{
+    if (APPMAX_STATE_IDLE == appmaxData.state)
+    {
+        return true;
+    }
+    return false;
+}
+void startTemperatureReading(void)
+{
+    appmaxData.state = APPMAX_STATE_START_TEMPERATURE_READING;
+}
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Initialization and State Machine Functions
@@ -159,8 +202,7 @@ void APPMAX_Tasks ( void )
                 {
                     DRV_SPI_TransferEventHandlerSet(appmaxData.drvSPIHandle, SPI0Instance1EventHandler, (uintptr_t)0);
                     appmaxData.typeOfError = SPI0_NO_ERROR; //If it comes from APPSPI1_STATE_DELAY_TO_REOPEN_SPI state, it needs to be cleared
-                    appmaxData.adelay = RTC_Timer32CounterGet();
-                    appmaxData.state = APPMAX_STATE_MEASURE_TEMPERATURE_EVERY_500ms;
+                    appmaxData.state = APPMAX_STATE_IDLE;
                 }
                 else
                 {
@@ -176,17 +218,15 @@ void APPMAX_Tasks ( void )
             break;
         }
         /* TODO: implement your application state machine.*/
-        case APPMAX_STATE_MEASURE_TEMPERATURE_EVERY_500ms:
+        case APPMAX_STATE_IDLE: break;
+        case APPMAX_STATE_START_TEMPERATURE_READING:
         {
-            if (abs_diff_uint32(RTC_Timer32CounterGet(), appmaxData.adelay) > _500ms)
+            appmaxData.state = APPMAX_WAIT_FOR_RECEPTION_END;
+            SS0_Clear();
+            DRV_SPI_ReadTransferAdd(appmaxData.drvSPIHandle,appmaxData.bufferRX,0x04,&appmaxData.transferHandle);
+            if(appmaxData.transferHandle == DRV_SPI_TRANSFER_HANDLE_INVALID)
             {
-                appmaxData.state = APPMAX_WAIT_FOR_RECEPTION_END;
-                SS0_Clear();
-                DRV_SPI_ReadTransferAdd(appmaxData.drvSPIHandle,appmaxData.bufferRX,0x04,&appmaxData.transferHandle);
-                if(appmaxData.transferHandle == DRV_SPI_TRANSFER_HANDLE_INVALID)
-                {
-                    appmaxData.state = APPMAX_STATE_ERROR;
-                }
+                appmaxData.state = APPMAX_STATE_ERROR;
             }
             break;
         }
@@ -200,7 +240,7 @@ void APPMAX_Tasks ( void )
                 {   
                     appmaxData.adelay = RTC_Timer32CounterGet();
                     appmaxData.typeThermocoupleError = decodeThermocoupleError(appmaxData.bufferRX[0x03]);
-                    appmaxData.state = APPMAX_STATE_MEASURE_TEMPERATURE_EVERY_500ms;
+                    appmaxData.state = APPMAX_STATE_IDLE;
                 }
             }
             break;
