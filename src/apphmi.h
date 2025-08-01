@@ -76,7 +76,12 @@ typedef enum
     APPHMI_STATE_GET_INTERNAL_TEMPERATUE,        
     APPHMI_STATE_WRITE_CURRENT_TEMPERATURE,
     APPHMI_STATE_WRITE_INTERNAL_TEMPERATURE,
-    APPHMI_STATE_UPDATE_TEMPERATURES        
+    APPHMI_STATE_UPDATE_TEMPERATURES,
+    APPHMI_STATE_REQUEST_START_SET_PARAMETERS,
+    APPHMI_STATE_WAI_USER_SELECTION_PARAMETERS_MENU,
+    APPHMI_STATE_START_EDIT_PARAMETER,
+    APPHMI_STATE_TEST1,
+    APPHMI_STATE_TEST2        
 } APPHMI_STATES;
 
 
@@ -98,6 +103,7 @@ typedef struct
     /* The application's current state */
     APPHMI_STATES state;
     /* TODO: Define any additional data used by the application. */
+    APPHMI_STATES stateToReturn;
     uint8_t messagePointer;
     uint8_t selectedOption;
     uint8_t typeErrorThermocuple;
@@ -106,6 +112,7 @@ typedef struct
     float internalTemp;
     char bufferForStrings[40];
     bool doNotClearLCD;
+    uint8_t firstVisibleIndex;
 } APPHMI_DATA;
 
 // *****************************************************************************
