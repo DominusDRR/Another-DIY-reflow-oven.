@@ -89,7 +89,9 @@ typedef enum
     APPGLCD_STATE_START_DRAW_LOGO,
     APPGLCD_STATE_DRAW_LOGO,
     APPGLCD_STATE_START_WRITE_MESSAGE_ROW,
-    APPGLCD_STATE_WRITE_MESSAGE_ROW        
+    APPGLCD_STATE_WRITE_MESSAGE_ROW,
+    APPGLCD_STATE_START_WRITE_MESSAGE_SCALED,
+    APPGLCD_STATE_WRITE_MESSAGE_SCALED        
 } APPGLCD_STATES;
 
 
@@ -130,6 +132,10 @@ typedef struct
     uint8_t *dataPtr;
     bool inv;
     bool updateLCD;
+    uint8_t scale;
+    uint8_t bit;
+    //uint8_t col8u/;
+    const uint8_t *glyph;
     APPGLCD_STATES stateToReturn;
 } APPGLCD_DATA;
 
