@@ -222,7 +222,10 @@ void LCDUpdate(void);
 void LCDPixelXY(uint32_t x, uint32_t y);
 void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD);
+void LCDChrXY_Scaled(uint8_t x, uint8_t y, const uint8_t *dataPtr, uint8_t scale, bool updateLCD);
 void drawInitialLogo(void);
+void SetPixel(uint8_t x, uint8_t y);
+void updateLCDOrIdleState(void);
 /* TODO:  Add any necessary local functions.
 */
 /****************************************************************************/
@@ -342,6 +345,23 @@ void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD)
     appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_ROW;
 }
 /****************************************************************************/
+/*  Plots an enlarged text in the X and Y coordinates.                      */
+/*  Function : LCDChrXY_Scaled                                              */
+/*  Parameters                                                              */
+/*  Input   :  row in which you want to write the text dataPtr, if it is    */
+/* inverted, inv must be different from zero                                */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDChrXY_Scaled(uint8_t x, uint8_t y, const uint8_t *dataPtr, uint8_t scale, bool updateLCD)
+{
+    appglcdData.pointerX1 = x;
+    appglcdData.pointerY1 = y;
+    appglcdData.dataPtr = (uint8_t*)dataPtr;
+    appglcdData.updateLCD = updateLCD;
+    appglcdData.scale = scale;
+    appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_SCALED;
+}
+/****************************************************************************/
 /*  Graphically represents Sicoy's initial logo.                                                            */
 /*  Function : drawInitialLogo                                              */
 /*  Parameters                                                              */
@@ -357,16 +377,44 @@ void drawInitialLogo(void)
     appglcdData.logoSample = logoSicoy[0];
     appglcdData.state = APPGLCD_STATE_START_DRAW_LOGO;
 }
-void SetPixel(unsigned char x, unsigned char y)
+/****************************************************************************/
+/*  Plot a point at the x and y coordinates                                 */
+/*  Function : drawInitialLogo                                              */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void SetPixel(uint8_t x, uint8_t y)
 {
-    if (x >= LCD_X_RES || y >= LCD_Y_RES) return;
-
-    unsigned int index = x + (y / 8) * LCD_X_RES;
+    if (x >= LCD_X_RES || y >= LCD_Y_RES) 
+    {
+        return;
+    }
+    uint16_t index = x + (y / 8) * LCD_X_RES;
     appglcdData.LcdMemory[index] |= (1 << (y % 8));
 }
+/****************************************************************************/
+/*  After modifying the arrangement for the LCD, you can transfer that      */
+/* information to the screen or the task to go idle state.                  */
+/*  Function : updateLCDOrIdleState                                         */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void updateLCDOrIdleState(void)
+{
+    if (appglcdData.updateLCD)
+    {
+        appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
+        appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
+    }
+    else
+    {
+        appglcdData.state = APPGLCD_STATE_IDLE;
+    }
+}
 
-// Función genérica para dibujar un carácter escalado
-void LCDChrXY_Scaled(unsigned char x, unsigned char y, unsigned char ch, unsigned char scale)
+void LCDChrXY_Tiny(unsigned char x, unsigned char y, unsigned char ch)
 {
     const unsigned char *glyph = FontLookup[ch - 32];
     for (unsigned char col = 0; col < 5; col++)
@@ -376,69 +424,169 @@ void LCDChrXY_Scaled(unsigned char x, unsigned char y, unsigned char ch, unsigne
         {
             if (byte & (1 << bit))
             {
-                for (unsigned char dy = 0; dy < scale; dy++)
-                {
-                    for (unsigned char dx = 0; dx < scale; dx++)
-                    {
-                        SetPixel(x + col * scale + dx, y + bit * scale + dy);
-                    }
-                }
+                SetPixel(x + col, y + bit);
             }
         }
     }
 }
-//void LCDChrXY_Scaled(unsigned char x, unsigned char page, unsigned char ch, unsigned char scale)
-//{
-//    const unsigned char *glyph = FontLookup[ch - 32];
-//    // cada "page" son 8px verticales; 
-//    // vamos a escribir directamente en LcdMemory bit a bit
-//    for (unsigned char col = 0; col < 5; col++) 
-//    {
-//        unsigned char byte = glyph[col];
-//        for (unsigned char bit = 0; bit < 7; bit++) 
-//        {
-//            bool pixel_on = (byte >> bit) & 0x01;
-//            if (!pixel_on) continue;
-//            // origen de píxel en coordenadas (x+col, y=page*8+bit)
-//            unsigned int orig_x = x*6 + col;
-//            unsigned int orig_y = page*8 + bit;
-//            // replicar en scale×scale
-//            for (unsigned char dy = 0; dy < scale; dy++) 
-//            {
-//                for (unsigned char dx = 0; dx < scale; dx++) 
-//                {
-//                    unsigned int px = orig_x*scale + dx;
-//                    unsigned int py = orig_y*scale + dy;
-//                    // calcular índice en LcdMemory (cada byte = 8px verticales)
-//                    unsigned int target_page = py / 8;
-//                    unsigned int bit_in_byte = py % 8;
-//                    unsigned int index = px + target_page*84;
-//                    appglcdData.LcdMemory[index] |= (1 << bit_in_byte);
-//                }
-//            }
-//        }
-//    }
-//}
 
-//void LCDStr_Scaled(unsigned char page, const unsigned char *str, unsigned char scale)
-void LCDStr_Scaled(unsigned char x, unsigned char y, const unsigned char *str, unsigned char scale)
+
+void LCDStr_Tiny(unsigned char x, unsigned char y, const unsigned char *str)
 {
-//    unsigned char xpos = 0;
-//    while (*str) 
-//    {
-//        LCDChrXY_Scaled(xpos, page, *str, scale);
-//        xpos += (5 * scale) + 1;  // ancho=glyph(5px×scale)+espacio
-//        str++;
-//    }
-     while (*str)
+    while (*str)
     {
-        LCDChrXY_Scaled(x, y, *str, scale);
-        x += 6 * scale; // 5 columnas + 1 espacio
+        LCDChrXY_Tiny(x, y, *str);
+        x += 5; // solo 5px de ancho, sin espacio adicional
         str++;
+    }
+    //LCDUpdate();
+}
+
+const uint8_t TinyFont[95][3] = 
+{
+    {0x00, 0x00, 0x00}, // ' '
+    {0x00, 0x17, 0x00}, // '!'
+    {0x03, 0x00, 0x03}, // '"'
+    {0x1F, 0x0A, 0x1F}, // '#'
+    {0x0A, 0x1F, 0x05}, // '$'
+    {0x13, 0x04, 0x19}, // '%'
+    {0x0A, 0x15, 0x1A}, // '&'
+    {0x00, 0x03, 0x00}, // '''
+    {0x0E, 0x11, 0x00}, // '('
+    {0x00, 0x11, 0x0E}, // ')'
+    {0x05, 0x02, 0x05}, // '*'
+    {0x04, 0x0E, 0x04}, // '+'
+    {0x10, 0x08, 0x00}, // ','
+    {0x04, 0x04, 0x04}, // '-'
+    {0x00, 0x10, 0x00}, // '.'
+    {0x18, 0x04, 0x03}, // '/'
+    {0x1F, 0x11, 0x1F}, // '0'
+    {0x00, 0x1F, 0x00}, // '1'
+    {0x1D, 0x15, 0x17}, // '2'
+    {0x15, 0x15, 0x1F}, // '3'
+    {0x07, 0x04, 0x1F}, // '4'
+    {0x17, 0x15, 0x1D}, // '5'
+    {0x1F, 0x15, 0x1D}, // '6'
+    {0x01, 0x01, 0x1F}, // '7'
+    {0x1F, 0x15, 0x1F}, // '8'
+    {0x17, 0x15, 0x1F}, // '9'
+    {0x00, 0x0A, 0x00}, // ':'
+    {0x10, 0x0A, 0x00}, // ';'
+    {0x04, 0x0A, 0x11}, // '<'
+    {0x0A, 0x0A, 0x0A}, // '='
+    {0x11, 0x0A, 0x04}, // '>'
+    {0x01, 0x15, 0x07}, // '?'
+    {0x0E, 0x15, 0x16}, // '@'
+    {0x1F, 0x05, 0x1F}, // 'A'
+    {0x1F, 0x15, 0x0A}, // 'B'
+    {0x0E, 0x11, 0x11}, // 'C'
+    {0x1F, 0x11, 0x0E}, // 'D'
+    {0x1F, 0x15, 0x11}, // 'E'
+    {0x1F, 0x05, 0x01}, // 'F'
+    {0x0E, 0x11, 0x1D}, // 'G'
+    {0x1F, 0x04, 0x1F}, // 'H'
+    {0x11, 0x1F, 0x11}, // 'I'
+    {0x08, 0x10, 0x0F}, // 'J'
+    {0x1F, 0x04, 0x1B}, // 'K'
+    {0x1F, 0x10, 0x10}, // 'L'
+    {0x1F, 0x06, 0x1F}, // 'M'
+    {0x1F, 0x0E, 0x1F}, // 'N'
+    {0x0E, 0x11, 0x0E}, // 'O'
+    {0x1F, 0x05, 0x02}, // 'P'
+    {0x0E, 0x19, 0x1E}, // 'Q'
+    {0x1F, 0x0D, 0x16}, // 'R'
+    {0x12, 0x15, 0x09}, // 'S'
+    {0x01, 0x1F, 0x01}, // 'T'
+    {0x0F, 0x10, 0x1F}, // 'U'
+    {0x07, 0x18, 0x07}, // 'V'
+    {0x1F, 0x0C, 0x1F}, // 'W'
+    {0x1B, 0x04, 0x1B}, // 'X'
+    {0x03, 0x1C, 0x03}, // 'Y'
+    {0x19, 0x15, 0x13}, // 'Z'
+    {0x1F, 0x11, 0x00}, // '['
+    {0x03, 0x04, 0x18}, // '\'
+    {0x00, 0x11, 0x1F}, // ']'
+    {0x02, 0x01, 0x02}, // '^'
+    {0x10, 0x10, 0x10}, // '_'
+    {0x01, 0x02, 0x00}, // '`'
+    {0x1A, 0x16, 0x1C}, // 'a'
+    {0x1F, 0x14, 0x08}, // 'b'
+    {0x0C, 0x12, 0x12}, // 'c'
+    {0x08, 0x14, 0x1F}, // 'd'
+    {0x0C, 0x1A, 0x14}, // 'e'
+    {0x04, 0x1E, 0x05}, // 'f'
+    {0x04, 0x2A, 0x1E}, // 'g'
+    {0x1F, 0x04, 0x18}, // 'h'
+    {0x00, 0x1D, 0x00}, // 'i'
+    {0x10, 0x20, 0x1D}, // 'j'
+    {0x1F, 0x08, 0x14}, // 'k'
+    {0x11, 0x1F, 0x10}, // 'l'
+    {0x1E, 0x0C, 0x1E}, // 'm'
+    {0x1E, 0x02, 0x1C}, // 'n'
+    {0x0C, 0x12, 0x0C}, // 'o'
+    {0x3E, 0x0A, 0x04}, // 'p'
+    {0x04, 0x0A, 0x3E}, // 'q'
+    {0x1C, 0x02, 0x02}, // 'r'
+    {0x14, 0x1E, 0x0A}, // 's'
+    {0x02, 0x1F, 0x12}, // 't'
+    {0x0E, 0x10, 0x1E}, // 'u'
+    {0x06, 0x18, 0x06}, // 'v'
+    {0x1E, 0x0C, 0x1E}, // 'w'
+    {0x12, 0x0C, 0x12}, // 'x'
+    {0x02, 0x24, 0x1E}, // 'y'
+    {0x1A, 0x1E, 0x16}, // 'z'
+    {0x04, 0x1B, 0x11}, // '{'
+    {0x00, 0x1F, 0x00}, // '|'
+    {0x11, 0x1B, 0x04}, // '}'
+    {0x02, 0x01, 0x02}, // '~'
+};
+
+
+
+void LCDTinyDigit(uint8_t x, uint8_t y, uint8_t digit)
+{
+    if (digit > 9) return; // solo 0-9
+    const uint8_t *glyph = TinyFont[digit];
+
+    for (uint8_t col = 0; col < 3; col++)
+    {
+        uint8_t bits = glyph[col];
+        for (uint8_t row = 0; row < 5; row++)
+        {
+            if (bits & (1 << row))
+            {
+                SetPixel(x + col, y + row);
+            }
+        }
     }
 }
 
+void LCDTinyChar(uint8_t x, uint8_t y, char ch)
+{
+    if (ch < 32 || ch > 126) return; // fuera del rango ASCII imprimible
+    const uint8_t *glyph = TinyFont[ch - 32];
 
+    for (uint8_t col = 0; col < 3; col++)
+    {
+        uint8_t bits = glyph[col];
+        for (uint8_t row = 0; row < 5; row++)
+        {
+            if (bits & (1 << row))
+            {
+                SetPixel(x + col, y + row);
+            }
+        }
+    }
+}
+void LCDTinyStr(uint8_t x, uint8_t y, const char *str)
+{
+    while (*str)
+    {
+        LCDTinyChar(x, y, *str);
+        x += 4; // 3 px + 1 espacio
+        str++;
+    }
+}
 
 // *****************************************************************************
 // *****************************************************************************
@@ -713,15 +861,7 @@ void APPGLCD_Tasks ( void )
                 else
                 {
                     appglcdData.pointerY1 = 0x00;
-                    if (appglcdData.updateLCD)
-                    {
-                        appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
-                        appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
-                    }
-                    else
-                    {
-                        appglcdData.state = APPGLCD_STATE_IDLE;
-                    }
+                    updateLCDOrIdleState();
                 }
             }
             break;
@@ -761,6 +901,71 @@ void APPGLCD_Tasks ( void )
                 appglcdData.xMessage++;
                 appglcdData.dataPtr++; 
                 appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_ROW;
+            }
+            break;
+        }
+        case APPGLCD_STATE_START_WRITE_MESSAGE_SCALED:
+        {
+            if (IsSPI1TaskIdle())
+            {
+                if (*appglcdData.dataPtr) 
+                {
+                    appglcdData.glyph = FontLookup[*appglcdData.dataPtr - 32];
+                    appglcdData.pointerX2 = 0x00;
+                    appglcdData.pointerY2 = 0x00;
+                    appglcdData.bit = 0x00;
+                    appglcdData.col = 0x00;
+                    appglcdData.state = APPGLCD_STATE_WRITE_MESSAGE_SCALED;
+                }
+                else
+                {
+                    updateLCDOrIdleState();
+                }
+            }
+            break;
+        }
+        case APPGLCD_STATE_WRITE_MESSAGE_SCALED:
+        {
+            if (IsSPI1TaskIdle())
+            {
+                if (appglcdData.col < 0x05)
+                {
+                    uint8_t byte = appglcdData.glyph[appglcdData.col];
+                    if (appglcdData.bit < 0x07)
+                    {
+                        if (byte & (1 << appglcdData.bit))
+                        {
+                            if (appglcdData.pointerY2 < appglcdData.scale)
+                            {
+                                if (appglcdData.pointerX2 < appglcdData.scale)
+                                {
+                                    SetPixel(appglcdData.pointerX1 + appglcdData.col * appglcdData.scale + appglcdData.pointerX2, appglcdData.pointerY1 + appglcdData.bit * appglcdData.scale + appglcdData.pointerY2);
+                                    appglcdData.pointerX2++;
+                                }
+                                else
+                                {
+                                    appglcdData.pointerX2 = 0x00;
+                                    appglcdData.pointerY2++;
+                                }
+                                return;
+                            }
+                        }
+                        appglcdData.pointerX2 = 0x00;
+                        appglcdData.pointerY2 = 0x00;
+                        appglcdData.bit++;
+                        return;
+                    }
+                    appglcdData.pointerX2 = 0x00;
+                    appglcdData.pointerY2 = 0x00;
+                    appglcdData.bit = 0x00;
+                    appglcdData.col++;
+                }
+                else
+                {
+                    appglcdData.pointerX1 += 6 * appglcdData.scale; // 5 columnas + 1 espacio
+                    appglcdData.dataPtr++; 
+                    appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_SCALED;
+                }
             }
             break;
         }
