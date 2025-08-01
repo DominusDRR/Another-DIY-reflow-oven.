@@ -37,7 +37,8 @@
 // Section: Global Data Definitions
 // *****************************************************************************
 // *****************************************************************************
-
+#define TOTAL_ITEMS          (sizeof(msgsParametersMenu)/sizeof(*msgsParametersMenu)) // 8 messages
+#define VISIBLE_ROWS         6
 // *****************************************************************************
 /* Application Data
 
@@ -64,6 +65,18 @@ const unsigned char *msgsHomeMenu[] =
     (unsigned char *)"Current Temp"
 };
 
+const unsigned char *msgsParametersMenu[] = 
+{
+    (unsigned char *)"1 Temp preheat", // max 14 chars
+    (unsigned char *)"2 Time preheat", 
+    (unsigned char *)"3 Temp flux act",
+    (unsigned char *)"4 Time flux act",
+    (unsigned char *)"5 Temp reflow",
+    (unsigned char *)"6 Time reflow",
+    (unsigned char *)"7 Temp cooling",
+    (unsigned char *)"8 Time cooling",
+};
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
@@ -77,6 +90,9 @@ extern void LCDUpdate(void);
 extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD);
 extern void drawInitialLogo(void);
+//extern void LCDStr_Scaled(unsigned char page, const unsigned char *str, unsigned char scale);
+extern void LCDStr_Scaled(unsigned char x, unsigned char y, const unsigned char *str, unsigned char scale);
+
 extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 extern uint8_t getPressedBtn(void);
 
@@ -90,12 +106,17 @@ extern void startTemperatureReading(void);
 // Section: Application Local Functions
 // *****************************************************************************
 // *****************************************************************************
-
+void returnHomeMenu(void);
 
 /* TODO:  Add any necessary local functions.
 */
-
-
+void returnHomeMenu(void)
+{
+    apphmiData.typeErrorThermocuple = 0xFF; 
+    apphmiData.selectedOption = 0x02;
+    apphmiData.doNotClearLCD = false; //This flag can be set to true, so it is cleared for the proxy.
+    apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+}
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Initialization and State Machine Functions
@@ -177,6 +198,7 @@ void APPHMI_Tasks ( void )
                 }
                 else
                 {
+                    apphmiData.stateToReturn = APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU;
                     apphmiData.state = APPHMI_STATE_UPDATE_HOME_MENU;
                 }
             }
@@ -188,14 +210,14 @@ void APPHMI_Tasks ( void )
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
                 LCDUpdate();
-                apphmiData.state = APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU;
+                apphmiData.state = apphmiData.stateToReturn;
             }
             break;
         }
         case APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU:
         {
             uint8_t button = getPressedBtn();
-            if (NO_BUTTON_PRESSED != button)
+            if (NO_BUTTON_PRESSED != button && IsGLCDTaskIdle())
             {
                 switch (button)
                 {
@@ -205,6 +227,14 @@ void APPHMI_Tasks ( void )
                         {
                             apphmiData.adelay = RTC_Timer32CounterGet();
                             apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING;
+                        }
+                        else if (0x03 == apphmiData.selectedOption) // To parameters Menu
+                        {
+                            LCDClear();
+                            apphmiData.messagePointer = 0x00;
+                            apphmiData.selectedOption = 0x00;
+                            apphmiData.firstVisibleIndex = 0x00;
+                            apphmiData.state =  APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
                         }
                         break;
                     }
@@ -252,10 +282,7 @@ void APPHMI_Tasks ( void )
             }
             if (ESC_BUTTON_PRESSED == getPressedBtn()) // Return to the HOME menu
             {
-                apphmiData.typeErrorThermocuple = 0xFF; 
-                apphmiData.selectedOption = 0x02;
-                apphmiData.doNotClearLCD = false; //This flag can be set to true, so it is cleared for the proxy.
-                apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+                returnHomeMenu();
             }
             break;
         }
@@ -296,10 +323,10 @@ void APPHMI_Tasks ( void )
             {
                 switch (apphmiData.typeErrorThermocuple)
                 {
-                    case OPEN_THERMOCOUPLE:     LCDStr(0x02,(unsigned char *)"Thermocouple  open",false, true); break;
-                    case SHORT_CIRCUIT_TO_GND:  LCDStr(0x02,(unsigned char *)"Thermocouple  to GNC",false, true); break;
-                    case SHORT_CIRCUIT_TO_VCC:  LCDStr(0x02,(unsigned char *)"Thermocouple  to Vcc",false, true); break;
-                    default: apphmiData.state = APPHMI_STATE_GET_THERMOCUPLE_TEMPERATUE; return;
+                    case OPEN_THERMOCOUPLE:     LCDStr(0x02,(unsigned char *)"Thermocouple  open",false, true);     break;
+                    case SHORT_CIRCUIT_TO_GND:  LCDStr(0x02,(unsigned char *)"Thermocouple  to GNC",false, true);   break;
+                    case SHORT_CIRCUIT_TO_VCC:  LCDStr(0x02,(unsigned char *)"Thermocouple  to Vcc",false, true);   break;
+                    default:                    apphmiData.state = APPHMI_STATE_GET_THERMOCUPLE_TEMPERATUE;         return;
                 }
                 apphmiData.adelay = RTC_Timer32CounterGet();
                 apphmiData.state = APPHMI_STATE_REQUEST_START_TEMPERATURE_READING;
@@ -322,9 +349,6 @@ void APPHMI_Tasks ( void )
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
-                //static char buf1[40];
-                LCDStr(0, (uint8_t*)"Thermocuple   Temp       ", false, false);
-                LCDStr(3, (uint8_t*)"Internal      Temp       ", false, false);//I clean the information from the LCD
                 snprintf(apphmiData.bufferForStrings, sizeof(apphmiData.bufferForStrings),"Thermocuple   Temp %.1f C", apphmiData.thermocoupleTemp);
                 LCDStr(0, (uint8_t*)apphmiData.bufferForStrings, false, false);
                 apphmiData.state = APPHMI_STATE_WRITE_INTERNAL_TEMPERATURE;
@@ -355,6 +379,102 @@ void APPHMI_Tasks ( void )
             break;
         }
         /*****************************************************************************************************************/
+        /** MENU SET PARAMETERS **/
+        case APPHMI_STATE_REQUEST_START_SET_PARAMETERS:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                if (apphmiData.messagePointer < VISIBLE_ROWS)
+                {
+                    uint8_t idx = apphmiData.firstVisibleIndex + apphmiData.messagePointer;
+                    if (idx < TOTAL_ITEMS) //VISIBLE_ROWS = 6
+                    {
+                        LCDStr(apphmiData.messagePointer, msgsParametersMenu[idx],(idx == apphmiData.selectedOption), false);
+                    }
+                    apphmiData.messagePointer++;
+                }
+                else
+                {
+                    apphmiData.messagePointer = 0x00;
+                    apphmiData.stateToReturn = APPHMI_STATE_WAI_USER_SELECTION_PARAMETERS_MENU;
+                    apphmiData.state = APPHMI_STATE_UPDATE_HOME_MENU;
+                }
+            }
+            break;
+        }
+        case APPHMI_STATE_WAI_USER_SELECTION_PARAMETERS_MENU:
+        {
+            uint8_t button = getPressedBtn();
+            if (NO_BUTTON_PRESSED != button)
+            {
+                switch (button)
+                {
+                    case OK_BUTTON_PRESSED:
+                    {
+                        apphmiData.state = APPHMI_STATE_START_EDIT_PARAMETER;
+                        break;
+                    }
+                    case UP_BUTTON_PRESSED:
+                    {   
+                        if (apphmiData.selectedOption > 0)
+                        {
+                            apphmiData.selectedOption--;
+                            if (apphmiData.selectedOption < apphmiData.firstVisibleIndex)
+                            {
+                                apphmiData.firstVisibleIndex = apphmiData.selectedOption;
+                            }
+                            apphmiData.state = APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
+                        }       
+                        break;
+                    }
+                    case DOWN_BUTTON_PRESSED:
+                    {
+                        if (apphmiData.selectedOption < (TOTAL_ITEMS - 1))
+                        {
+                            apphmiData.selectedOption++;
+                            if (apphmiData.selectedOption >= apphmiData.firstVisibleIndex + VISIBLE_ROWS)// 0 +6
+                            {
+                                apphmiData.firstVisibleIndex = apphmiData.selectedOption - (VISIBLE_ROWS - 1); //= 6 - 6 + 1 = 1
+                            }
+                            apphmiData.state = APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
+                        }
+                        break;
+                    }
+                    default: returnHomeMenu();
+                }
+            }
+            break;
+        }
+        case APPHMI_STATE_START_EDIT_PARAMETER:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDClear();
+                apphmiData.state = APPHMI_STATE_TEST1;
+            }
+            break;
+        }
+        case APPHMI_STATE_TEST1:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                //LCDStr_Scaled(0,(unsigned char *)"HOLA", 0x01);
+                LCDStr_Scaled(0,0,(unsigned char *)"HOLA",2);
+                LCDStr_Scaled(0, 27, (unsigned char *)"MUNDO", 3);    // Línea 2 (después de ~21 px alto)
+                apphmiData.state = APPHMI_STATE_TEST2;
+            }
+            break;
+        }
+        case APPHMI_STATE_TEST2:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDUpdate();
+                apphmiData.state++;
+            }
+            break;
+        }
+        /**************************************************************/
         /* The default state should never be executed. */
         default: break; /* TODO: Handle error in application's state machine. */
     }
