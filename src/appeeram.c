@@ -508,6 +508,7 @@ void APPEERAM_Tasks ( void )
         {
             if (verifyDataStoredInEERAM())
             {
+                memcpy(appeeramData.parameters, BufferReception, MAXIMUM_BUFFER_RECEIVE);
                 appeeramData.state = APPEERAM_STATE_IDLE;
             }
             else
