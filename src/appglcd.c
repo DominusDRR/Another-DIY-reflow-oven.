@@ -357,6 +357,88 @@ void drawInitialLogo(void)
     appglcdData.logoSample = logoSicoy[0];
     appglcdData.state = APPGLCD_STATE_START_DRAW_LOGO;
 }
+void SetPixel(unsigned char x, unsigned char y)
+{
+    if (x >= LCD_X_RES || y >= LCD_Y_RES) return;
+
+    unsigned int index = x + (y / 8) * LCD_X_RES;
+    appglcdData.LcdMemory[index] |= (1 << (y % 8));
+}
+
+// Función genérica para dibujar un carácter escalado
+void LCDChrXY_Scaled(unsigned char x, unsigned char y, unsigned char ch, unsigned char scale)
+{
+    const unsigned char *glyph = FontLookup[ch - 32];
+    for (unsigned char col = 0; col < 5; col++)
+    {
+        unsigned char byte = glyph[col];
+        for (unsigned char bit = 0; bit < 7; bit++)
+        {
+            if (byte & (1 << bit))
+            {
+                for (unsigned char dy = 0; dy < scale; dy++)
+                {
+                    for (unsigned char dx = 0; dx < scale; dx++)
+                    {
+                        SetPixel(x + col * scale + dx, y + bit * scale + dy);
+                    }
+                }
+            }
+        }
+    }
+}
+//void LCDChrXY_Scaled(unsigned char x, unsigned char page, unsigned char ch, unsigned char scale)
+//{
+//    const unsigned char *glyph = FontLookup[ch - 32];
+//    // cada "page" son 8px verticales; 
+//    // vamos a escribir directamente en LcdMemory bit a bit
+//    for (unsigned char col = 0; col < 5; col++) 
+//    {
+//        unsigned char byte = glyph[col];
+//        for (unsigned char bit = 0; bit < 7; bit++) 
+//        {
+//            bool pixel_on = (byte >> bit) & 0x01;
+//            if (!pixel_on) continue;
+//            // origen de píxel en coordenadas (x+col, y=page*8+bit)
+//            unsigned int orig_x = x*6 + col;
+//            unsigned int orig_y = page*8 + bit;
+//            // replicar en scale×scale
+//            for (unsigned char dy = 0; dy < scale; dy++) 
+//            {
+//                for (unsigned char dx = 0; dx < scale; dx++) 
+//                {
+//                    unsigned int px = orig_x*scale + dx;
+//                    unsigned int py = orig_y*scale + dy;
+//                    // calcular índice en LcdMemory (cada byte = 8px verticales)
+//                    unsigned int target_page = py / 8;
+//                    unsigned int bit_in_byte = py % 8;
+//                    unsigned int index = px + target_page*84;
+//                    appglcdData.LcdMemory[index] |= (1 << bit_in_byte);
+//                }
+//            }
+//        }
+//    }
+//}
+
+//void LCDStr_Scaled(unsigned char page, const unsigned char *str, unsigned char scale)
+void LCDStr_Scaled(unsigned char x, unsigned char y, const unsigned char *str, unsigned char scale)
+{
+//    unsigned char xpos = 0;
+//    while (*str) 
+//    {
+//        LCDChrXY_Scaled(xpos, page, *str, scale);
+//        xpos += (5 * scale) + 1;  // ancho=glyph(5px×scale)+espacio
+//        str++;
+//    }
+     while (*str)
+    {
+        LCDChrXY_Scaled(x, y, *str, scale);
+        x += 6 * scale; // 5 columnas + 1 espacio
+        str++;
+    }
+}
+
+
 
 // *****************************************************************************
 // *****************************************************************************
