@@ -154,6 +154,7 @@ typedef struct
     float   Kp;
     float   Ki;
     float   Kd;
+    uint8_t parameters[MAXIMUM_BUFFER_RECEIVE];
 } APPEERAM_DATA;
 
 // *****************************************************************************
