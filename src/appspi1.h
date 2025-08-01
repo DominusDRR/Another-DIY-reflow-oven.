@@ -47,6 +47,11 @@ extern "C" {
 // Section: Type Definitions
 // *****************************************************************************
 // *****************************************************************************
+#define LCD_X_RES                  84
+#define LCD_Y_RES                  48    
+    
+#define LCD_CACHE_SIZE             ((LCD_X_RES * LCD_Y_RES) / 8)    
+    
 #define  SPI1_NO_ERROR       0x00
 #define  SPI1_OPEN_ERROR     0x01
 #define  SPI1_SET_INSTANCE   0x02    
@@ -100,7 +105,7 @@ typedef struct
     DRV_SPI_TRANSFER_HANDLE transferHandle;
     DRV_SPI_TRANSFER_SETUP  setup; 
     uint8_t typeOfError;
-    uint8_t bufferTX[32]; //Buffer for transmission
+    uint8_t bufferTX[LCD_CACHE_SIZE]; //Buffer for transmission
     uint8_t numberBytesTransm; //number of bytes to be transmitted
     bool isTransferComplete;
     uint32_t adelay;
