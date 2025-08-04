@@ -39,12 +39,13 @@
 #define CRC_SEED                            0xFFFFFFFF
 #define MAXIMUM_NUMBER_EERAM_READ_ATTEMPTS  0x05
 
+#define PARAM_COUNT                         8
 #define MAXIMUM_TEMPERATURE_PER_POINT       250
 
 #define MAXIMUM_PREHEAT_TIME               180
 #define MINIMUM_PREHEAT_TIME               50
 
-#define MAXIMUM_FLUX_ACTIVATION_TIME        120
+#define MAXIMUM_FLUX_ACTIVATION_TIME        125
 #define MINIMUM_FLUX_ACTIVATION_TIME        40
 
 #define MAXIMUM_REFLOW_TIME                 200
@@ -100,6 +101,31 @@
 APPEERAM_DATA appeeramData;
 uint8_t BufferTransmission[MAXIMUM_BUFFER_TRANSMISSION];
 uint8_t BufferReception[MAXIMUM_BUFFER_RECEIVE];
+
+static uint16_t* const  paramArr[PARAM_COUNT] = 
+{
+    (uint16_t*)&appeeramData.temperatureA,
+    &appeeramData.timeA,
+    (uint16_t*)&appeeramData.temperatureB,
+    &appeeramData.timeB,
+    (uint16_t*)&appeeramData.temperatureC,
+    &appeeramData.timeC,
+    (uint16_t*)&appeeramData.temperatureD,
+    &appeeramData.timeD
+};
+
+static const uint16_t maxArr[PARAM_COUNT] = 
+{
+    MAXIMUM_TEMPERATURE_PER_POINT,   // tempA
+    MAXIMUM_PREHEAT_TIME,            // timeA
+    MAXIMUM_TEMPERATURE_PER_POINT,   // tempB
+    MAXIMUM_FLUX_ACTIVATION_TIME,    // timeB
+    MAXIMUM_TEMPERATURE_PER_POINT,   // tempC
+    MAXIMUM_REFLOW_TIME,             // timeC
+    MAXIMUM_TEMPERATURE_PER_POINT,   // tempD
+    MAXIMUM_COOLING_TIME             // timeD
+};
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
@@ -120,6 +146,9 @@ APPEERAM_STATES analyzeNumberAttempts(void);
 bool verifyDataStoredInEERAM(void);
 void setDefaultEERAMvalues(void);
 void initializeCRC(void* buffer);
+uint16_t returnParameterTempTime(uint8_t index);
+float returnConstantsPID(uint8_t index);
+uint16_t increaseParameterTempTime(uint8_t index);
 /* TODO:  Add any necessary local functions.
 */
 void initializeParametersI2C2(void)
@@ -211,18 +240,18 @@ bool verifyDataStoredInEERAM(void)
     {
         return false;
     }
-    memcpy(&appeeramData.Kp, &BufferReception[0x0C], sizeof(float)); //Kp
-    if (appeeramData.Kp < 0)
+    memcpy(&appeeramData.Kp, &BufferReception[0x0C], sizeof(appeeramData.Kp)); //Kp
+    if (appeeramData.Kp < 0 || appeeramData.Kp > 1)
     {
         return false;
     }
-    memcpy(&appeeramData.Ki, &BufferReception[0x10], sizeof(float)); //Ki    
-    if (appeeramData.Ki < 0)
+    memcpy(&appeeramData.Ki, &BufferReception[0x10], sizeof(appeeramData.Ki)); //Ki    
+    if (appeeramData.Ki < 0 || appeeramData.Ki > 1)
     {
         return false;
     }
-    memcpy(&appeeramData.Kd, &BufferReception[0x14], sizeof(float)); //Kd   
-     if (appeeramData.Kd < 0)
+    memcpy(&appeeramData.Kd, &BufferReception[0x14], sizeof(appeeramData.Kd)); //Kd   
+     if (appeeramData.Kd < 0 || appeeramData.Kd > 1)
     {
         return false;
     }
@@ -260,13 +289,13 @@ void setDefaultEERAMvalues(void)
             
             
     appeeramData.Kp = KP; 
-    BufferTransmission[0x0C] = KP;
+    memcpy(&BufferTransmission[0x0C],&appeeramData.Kp,sizeof(appeeramData.Kp));
     
     appeeramData.Ki = KI;
-    BufferTransmission[0x0D] = KI;
+    memcpy(&BufferTransmission[0x10],&appeeramData.Ki,sizeof(appeeramData.Ki));
     
     appeeramData.Kd = KD;
-    BufferTransmission[0x0E] = KD;
+    memcpy(&BufferTransmission[0x14],&appeeramData.Kd,sizeof(appeeramData.Kd));
 }
 void initializeCRC(void* buffer)
 {
@@ -278,6 +307,42 @@ void initializeCRC(void* buffer)
     DSU_REGS->DSU_STATUSA = DSU_REGS->DSU_STATUSA;
     DSU_REGS->DSU_CTRL = DSU_CTRL_CRC_Msk;
 }
+
+uint16_t returnParameterTempTime(uint8_t index)
+{
+    switch (index)
+    {
+        case 0x00:  return (uint16_t)(appeeramData.temperatureA);
+        case 0x01:  return appeeramData.timeA;
+        case 0x02:  return (uint16_t)(appeeramData.temperatureB);
+        case 0x03:  return appeeramData.timeB;
+        case 0x04:  return (uint16_t)(appeeramData.temperatureC);
+        case 0x05:  return appeeramData.timeC;
+        case 0x06:  return (uint16_t)(appeeramData.temperatureD);
+        default:    return appeeramData.timeD;
+    }
+}
+float returnConstantsPID(uint8_t index)
+{
+    switch (index)
+    {
+        case 0x08:  return appeeramData.Kp;
+        case 0x09:  return appeeramData.Ki;
+        default:    return appeeramData.Kd;
+    }
+}
+
+uint16_t increaseParameterTempTime(uint8_t index)
+{
+    uint16_t *p = paramArr[index];
+    uint16_t maxv = maxArr[index];
+    if (*p < maxv) 
+    {
+        (*p)++;
+    }
+    return *p;
+}
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Initialization and State Machine Functions
@@ -508,7 +573,7 @@ void APPEERAM_Tasks ( void )
         {
             if (verifyDataStoredInEERAM())
             {
-                memcpy(appeeramData.parameters, BufferReception, MAXIMUM_BUFFER_RECEIVE);
+                //memcpy(appeeramData.parameters, BufferReception, MAXIMUM_BUFFER_RECEIVE);
                 appeeramData.state = APPEERAM_STATE_IDLE;
             }
             else
