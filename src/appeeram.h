@@ -71,7 +71,7 @@ extern "C" {
 
 #define MAXIMUM_BUFFER_RECEIVE      40
 #define MAXIMUM_BUFFER_TRANSMISSION 40     
-#define APPEERAM_NUMBER_BYTE_READ   0x0F
+#define APPEERAM_NUMBER_BYTE_READ   0x1B
     
     
 typedef enum
@@ -154,7 +154,7 @@ typedef struct
     float   Kp;
     float   Ki;
     float   Kd;
-    uint8_t parameters[MAXIMUM_BUFFER_RECEIVE];
+    //uint8_t parameters[MAXIMUM_BUFFER_RECEIVE];
 } APPEERAM_DATA;
 
 // *****************************************************************************
