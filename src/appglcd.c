@@ -461,6 +461,27 @@ void LCDChrXY_Scaled(uint8_t x, uint8_t y, const uint8_t *dataPtr, uint8_t scale
     appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_SCALED;
 }
 /****************************************************************************/
+/*  Clear an enlarged text in the X and Y coordinates.                      */
+/*  Function : LCDChrXY_Scaled                                              */
+/*  Parameters                                                              */
+/*  Input   :  row in which you want to write the text dataPtr, if it is    */
+/* inverted, inv must be different from zero                                */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void LCDStr_Scaled_Clear(uint8_t x, uint8_t y, uint8_t len, uint8_t scale, bool updateLCD)
+{
+    appglcdData.pointerX1 = x;
+    appglcdData.pointerY1 = y;
+    appglcdData.pointerX2 = len;
+    appglcdData.bit = 0x00;
+    appglcdData.updateLCD = updateLCD;
+    appglcdData.scale = scale;
+    appglcdData.dx = 0x00;
+    appglcdData.dy = 0x00;
+    appglcdData.state = APPGLCD_STATE_START_CLEAR_MESSAGE_SCALED;
+}
+
+/****************************************************************************/
 /*  Graphically represents Sicoy's initial logo.                                                            */
 /*  Function : drawInitialLogo                                              */
 /*  Parameters                                                              */
@@ -493,6 +514,19 @@ void SetPixel(uint8_t x, uint8_t y)
     appglcdData.LcdMemory[index] |= (1 << (y % 8));
 }
 /****************************************************************************/
+/*  Clear a point at the x and y coordinates                                 */
+/*  Function : drawInitialLogo                                              */
+/*  Parameters                                                              */
+/*  Input   :  Nothing                                                      */
+/*  Output  :  Nothing                                                      */
+/****************************************************************************/
+void ClearPixel(uint8_t x, uint8_t y)
+{
+    if (x >= LCD_X_RES || y >= LCD_Y_RES) return;
+    uint16_t index = x + (y / 8) * LCD_X_RES;
+    appglcdData.LcdMemory[index] &= ~(1 << (y % 8));
+}
+/****************************************************************************/
 /*  After modifying the arrangement for the LCD, you can transfer that      */
 /* information to the screen or the task to go idle state.                  */
 /*  Function : updateLCDOrIdleState                                         */
@@ -504,6 +538,8 @@ void updateLCDOrIdleState(void)
 {
     if (appglcdData.updateLCD)
     {
+        appglcdData.updateLCD = false;
+        appglcdData.pointerY1 = 0x00; //This variable must be zero before clearing
         appglcdData.state = APPGLCD_STATE_START_GLCD_UPDATE;
         appglcdData.stateToReturn = APPGLCD_STATE_IDLE;
     }
@@ -989,6 +1025,41 @@ void APPGLCD_Tasks ( void )
                     appglcdData.pointerX1 += 4; // 3 px + 1 espacio
                     appglcdData.dataPtr++; 
                     appglcdData.state = APPGLCD_STATE_START_WRITE_MESSAGE_TINY;
+                }
+            }
+            break;
+        }
+        case APPGLCD_STATE_START_CLEAR_MESSAGE_SCALED:
+        {
+            if (IsSPI1TaskIdle())
+            {
+                if (appglcdData.bit < appglcdData.pointerX2)
+                {
+                    appglcdData.sx = appglcdData.pointerX1 + appglcdData.bit*6*appglcdData.scale;
+                    if (appglcdData.dy < (7*appglcdData.scale))
+                    {
+                        if (appglcdData.dx < (5*appglcdData.scale))
+                        {
+                            ClearPixel((uint8_t)(appglcdData.sx + appglcdData.dx), (uint8_t)(appglcdData.pointerY1 + appglcdData.dy));
+                            appglcdData.dx++;
+                        }
+                        else
+                        {
+                            appglcdData.dx = 0x00;
+                            appglcdData.dy++;
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        appglcdData.dy = 0x00;
+                        appglcdData.bit++;
+                    }
+                    return;
+                }
+                else
+                {
+                    updateLCDOrIdleState();
                 }
             }
             break;
