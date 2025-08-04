@@ -30,6 +30,7 @@
 #include "apphmi.h"
 #include "definitions.h"
 #include <stdio.h>
+#include <string.h>
 //#include <stdint.h>
 //#include <stdbool.h>
 // *****************************************************************************
@@ -75,6 +76,9 @@ const unsigned char *msgsParametersMenu[] =
     (unsigned char *)"6 Time reflow",
     (unsigned char *)"7 Temp cooling",
     (unsigned char *)"8 Time cooling",
+    (unsigned char *)"9 Kp constant ",
+    (unsigned char *)"10 Ki constant",
+    (unsigned char *)"11 Kd constant"
 };
 
 // *****************************************************************************
@@ -89,9 +93,10 @@ extern void LCDClear(void);
 extern void LCDUpdate(void);
 extern void LCDLine (int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 extern void LCDStr(uint8_t row, const uint8_t *dataPtr, bool inv, bool updateLCD);
+extern void LCDChrXY_Scaled(uint8_t x, uint8_t y, const uint8_t *dataPtr, uint8_t scale, bool updateLCD);
+extern void LCDStr_Scaled_Clear(uint8_t x, uint8_t y, uint8_t len, uint8_t scale, bool updateLCD);
+extern void LCDTinyStr(uint8_t x, uint8_t y, const char *dataPtr, bool updateLCD);
 extern void drawInitialLogo(void);
-//extern void LCDStr_Scaled(unsigned char page, const unsigned char *str, unsigned char scale);
-extern void LCDStr_Scaled(unsigned char x, unsigned char y, const unsigned char *str, unsigned char scale);
 
 extern uint32_t abs_diff_uint32(uint32_t a, uint32_t b);
 extern uint8_t getPressedBtn(void);
@@ -101,6 +106,10 @@ extern float getThermocoupleTemp(void);
 extern float getInternalTemp(void);
 extern bool IsMaxTaskIdle (void);
 extern void startTemperatureReading(void);
+
+extern uint16_t returnParameterTempTime(uint8_t index);
+extern float returnConstantsPID(uint8_t index);
+extern uint16_t increaseParameterTempTime(uint8_t index);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -116,6 +125,14 @@ void returnHomeMenu(void)
     apphmiData.selectedOption = 0x02;
     apphmiData.doNotClearLCD = false; //This flag can be set to true, so it is cleared for the proxy.
     apphmiData.state = APPHMI_STATE_CLEAR_LCD;
+}
+void goParametersMenu(void)
+{
+    LCDClear();
+    apphmiData.messagePointer = 0x00;
+    apphmiData.selectedOption = 0x00;
+    apphmiData.firstVisibleIndex = 0x00;
+    apphmiData.state =  APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
 }
 // *****************************************************************************
 // *****************************************************************************
@@ -198,7 +215,7 @@ void APPHMI_Tasks ( void )
                 }
                 else
                 {
-                    apphmiData.stateToReturn = APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU;
+                    apphmiData.stateToReturn = APPHMI_STATE_WAIT_USER_SELECTION_HOME_MENU;
                     apphmiData.state = APPHMI_STATE_UPDATE_HOME_MENU;
                 }
             }
@@ -214,7 +231,7 @@ void APPHMI_Tasks ( void )
             }
             break;
         }
-        case APPHMI_STATE_WAI_USER_SELECTION_HOME_MENU:
+        case APPHMI_STATE_WAIT_USER_SELECTION_HOME_MENU:
         {
             uint8_t button = getPressedBtn();
             if (NO_BUTTON_PRESSED != button && IsGLCDTaskIdle())
@@ -230,11 +247,7 @@ void APPHMI_Tasks ( void )
                         }
                         else if (0x03 == apphmiData.selectedOption) // To parameters Menu
                         {
-                            LCDClear();
-                            apphmiData.messagePointer = 0x00;
-                            apphmiData.selectedOption = 0x00;
-                            apphmiData.firstVisibleIndex = 0x00;
-                            apphmiData.state =  APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
+                            goParametersMenu();
                         }
                         break;
                     }
@@ -450,29 +463,80 @@ void APPHMI_Tasks ( void )
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
                 LCDClear();
-                apphmiData.state = APPHMI_STATE_TEST1;
+                apphmiData.state = APPHMI_STATE_SET_NAME_PARAMETER;
             }
             break;
         }
-        case APPHMI_STATE_TEST1:
+        case APPHMI_STATE_SET_NAME_PARAMETER:
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
-                //LCDStr_Scaled(0,(unsigned char *)"HOLA", 0x01);
-                LCDStr_Scaled(0,0,(unsigned char *)"HOLA",2);
-                LCDStr_Scaled(0, 27, (unsigned char *)"MUNDO", 3);    // Línea 2 (después de ~21 px alto)
-                apphmiData.state = APPHMI_STATE_TEST2;
+                //LCDTinyStr(0, 27,"Max: 32.8C", false);
+                strncpy(apphmiData.bufferForStrings, (const char *)msgsParametersMenu[apphmiData.selectedOption], 14);
+                apphmiData.bufferForStrings[14] = '\0';  // aseguramos que esté terminado en null
+                LCDStr(0,(uint8_t *)apphmiData.bufferForStrings,false, false);
+                apphmiData.state = APPHMI_STATE_SET_VALUE_PARAMETER;
             }
             break;
         }
-        case APPHMI_STATE_TEST2:
+        case APPHMI_STATE_SET_VALUE_PARAMETER:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                if (apphmiData.selectedOption < 0x08)
+                {
+                    sprintf(apphmiData.bufferForStrings, "%u C", returnParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
+                }
+                else
+                {
+                    sprintf(apphmiData.bufferForStrings, "%.1f", returnConstantsPID(apphmiData.selectedOption));
+                }
+                LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,false);
+                apphmiData.state = APPHMI_STATE_UPDATE_LCD_VALUE_PARAMETER;
+            }
+            break;
+        }
+        case APPHMI_STATE_UPDATE_LCD_VALUE_PARAMETER:
         {
             if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
             {
                 LCDUpdate();
-                apphmiData.state++;
+                apphmiData.state = APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS;
             }
             break;
+        }
+        case APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS:
+        {
+            uint8_t button = getPressedBtn();
+            if (NO_BUTTON_PRESSED != button && IsGLCDTaskIdle())
+            {
+                switch (button)
+                {
+                    case ESC_BUTTON_PRESSED: goParametersMenu(); break;
+                    case UP_BUTTON_PRESSED:
+                    {
+                        //LCDClear();//LCDChrXY_Scaled(5,15,(uint8_t *)"      ",2,true);LCDChrXY_Scaled only draws dark dots, the " " character, it does not plot it.
+                        LCDStr_Scaled_Clear(5,15,5,2,true);
+                        apphmiData.state = APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN;
+                        break;
+                    }
+                    default: break;    
+                }
+                
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN://The LCDChrXY_Scaled function does not clear the above, since it acts directly on each pixel on the screen, not at the byte level in the LCDBuffer.
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                if (apphmiData.selectedOption < 0x08)
+                {
+                    sprintf(apphmiData.bufferForStrings, "%u C", increaseParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
+                }
+                LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,true);//set to true to update the LCD immediately
+                apphmiData.state = APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS;
+            }
         }
         /**************************************************************/
         /* The default state should never be executed. */
