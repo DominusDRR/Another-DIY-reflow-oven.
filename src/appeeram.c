@@ -41,6 +41,7 @@
 
 #define PARAM_COUNT                         8
 #define MAXIMUM_TEMPERATURE_PER_POINT       250
+#define MINIMUM_TEMPERATURE_PER_POINT       20
 
 #define MAXIMUM_PREHEAT_TIME               180
 #define MINIMUM_PREHEAT_TIME               50
@@ -102,29 +103,64 @@ APPEERAM_DATA appeeramData;
 uint8_t BufferTransmission[MAXIMUM_BUFFER_TRANSMISSION];
 uint8_t BufferReception[MAXIMUM_BUFFER_RECEIVE];
 
-static uint16_t* const  paramArr[PARAM_COUNT] = 
+typedef enum { P8, P16 } PARAM_TYPE;
+//typedef struct {
+//    void       *ptr;   // puntero al dato
+//    PARAM_TYPE  type;  // uint8_t o uint16_t
+//    uint16_t    max;   // valor máximo
+//} ParamDesc;
+typedef struct {
+    void       *ptr;   // apunta al dato real
+    PARAM_TYPE  type;  // P8 = uint8_t, P16 = uint16_t
+    uint16_t    min;   // valor mínimo permitido
+    uint16_t    max;   // valor máximo permitido
+} ParamDesc;
+
+// Tabla de descriptores, uno por cada parámetro (8 en total)
+static const ParamDesc paramDesc[8] = 
 {
-    (uint16_t*)&appeeramData.temperatureA,
-    &appeeramData.timeA,
-    (uint16_t*)&appeeramData.temperatureB,
-    &appeeramData.timeB,
-    (uint16_t*)&appeeramData.temperatureC,
-    &appeeramData.timeC,
-    (uint16_t*)&appeeramData.temperatureD,
-    &appeeramData.timeD
+//    { &appeeramData.temperatureA,   P8,  MAXIMUM_TEMPERATURE_PER_POINT },  // idx 0
+//    { &appeeramData.timeA,          P16, MAXIMUM_PREHEAT_TIME          },  // idx 1
+//    { &appeeramData.temperatureB,   P8,  MAXIMUM_TEMPERATURE_PER_POINT },  // idx 2
+//    { &appeeramData.timeB,          P16, MAXIMUM_FLUX_ACTIVATION_TIME },  // idx 3
+//    { &appeeramData.temperatureC,   P8,  MAXIMUM_TEMPERATURE_PER_POINT },  // idx 4
+//    { &appeeramData.timeC,          P16, MAXIMUM_REFLOW_TIME          },  // idx 5
+//    { &appeeramData.temperatureD,   P8,  MAXIMUM_TEMPERATURE_PER_POINT },  // idx 6
+//    { &appeeramData.timeD,          P16, MAXIMUM_COOLING_TIME         }   // idx 7
+    { &appeeramData.temperatureA,   P8,  MINIMUM_TEMPERATURE_PER_POINT,     MAXIMUM_TEMPERATURE_PER_POINT   },
+    { &appeeramData.timeA,          P16, MINIMUM_PREHEAT_TIME,              MAXIMUM_PREHEAT_TIME            },
+    { &appeeramData.temperatureB,   P8,  MINIMUM_TEMPERATURE_PER_POINT,     MAXIMUM_TEMPERATURE_PER_POINT   },
+    { &appeeramData.timeB,          P16, MINIMUM_FLUX_ACTIVATION_TIME,      MAXIMUM_FLUX_ACTIVATION_TIME    },
+    // idx: 4                     5                   6                     7
+    { &appeeramData.temperatureC,   P8,  MINIMUM_TEMPERATURE_PER_POINT,     MAXIMUM_TEMPERATURE_PER_POINT   },
+    { &appeeramData.timeC,          P16, MINIMUM_REFLOW_TIME,               MAXIMUM_REFLOW_TIME             },
+    { &appeeramData.temperatureD,   P8,  MINIMUM_TEMPERATURE_PER_POINT,     MAXIMUM_TEMPERATURE_PER_POINT   },
+    { &appeeramData.timeD,          P16, MINIMUM_COOLING_TIME,              MAXIMUM_COOLING_TIME            }
 };
 
-static const uint16_t maxArr[PARAM_COUNT] = 
-{
-    MAXIMUM_TEMPERATURE_PER_POINT,   // tempA
-    MAXIMUM_PREHEAT_TIME,            // timeA
-    MAXIMUM_TEMPERATURE_PER_POINT,   // tempB
-    MAXIMUM_FLUX_ACTIVATION_TIME,    // timeB
-    MAXIMUM_TEMPERATURE_PER_POINT,   // tempC
-    MAXIMUM_REFLOW_TIME,             // timeC
-    MAXIMUM_TEMPERATURE_PER_POINT,   // tempD
-    MAXIMUM_COOLING_TIME             // timeD
-};
+//static uint16_t* const  paramArr[PARAM_COUNT] = 
+//{
+//    (uint16_t*)&appeeramData.temperatureA,
+//    &appeeramData.timeA,
+//    (uint16_t*)&appeeramData.temperatureB,
+//    &appeeramData.timeB,
+//    (uint16_t*)&appeeramData.temperatureC,
+//    &appeeramData.timeC,
+//    (uint16_t*)&appeeramData.temperatureD,
+//    &appeeramData.timeD
+//};
+//
+//static const uint16_t maxArr[PARAM_COUNT] = 
+//{
+//    MAXIMUM_TEMPERATURE_PER_POINT,   // tempA
+//    MAXIMUM_PREHEAT_TIME,            // timeA
+//    MAXIMUM_TEMPERATURE_PER_POINT,   // tempB
+//    MAXIMUM_FLUX_ACTIVATION_TIME,    // timeB
+//    MAXIMUM_TEMPERATURE_PER_POINT,   // tempC
+//    MAXIMUM_REFLOW_TIME,             // timeC
+//    MAXIMUM_TEMPERATURE_PER_POINT,   // tempD
+//    MAXIMUM_COOLING_TIME             // timeD
+//};
 
 // *****************************************************************************
 // *****************************************************************************
@@ -149,6 +185,8 @@ void initializeCRC(void* buffer);
 uint16_t returnParameterTempTime(uint8_t index);
 float returnConstantsPID(uint8_t index);
 uint16_t increaseParameterTempTime(uint8_t index);
+uint16_t decreaseParameterTempTime(uint8_t index); 
+
 /* TODO:  Add any necessary local functions.
 */
 void initializeParametersI2C2(void)
@@ -310,16 +348,14 @@ void initializeCRC(void* buffer)
 
 uint16_t returnParameterTempTime(uint8_t index)
 {
-    switch (index)
+    const ParamDesc *d = &paramDesc[index];
+    if (d->type == P8) 
     {
-        case 0x00:  return (uint16_t)(appeeramData.temperatureA);
-        case 0x01:  return appeeramData.timeA;
-        case 0x02:  return (uint16_t)(appeeramData.temperatureB);
-        case 0x03:  return appeeramData.timeB;
-        case 0x04:  return (uint16_t)(appeeramData.temperatureC);
-        case 0x05:  return appeeramData.timeC;
-        case 0x06:  return (uint16_t)(appeeramData.temperatureD);
-        default:    return appeeramData.timeD;
+        return (uint16_t)*(uint8_t *)(d->ptr);
+    } 
+    else 
+    {
+        return *(uint16_t *)(d->ptr);
     }
 }
 float returnConstantsPID(uint8_t index)
@@ -334,13 +370,49 @@ float returnConstantsPID(uint8_t index)
 
 uint16_t increaseParameterTempTime(uint8_t index)
 {
-    uint16_t *p = paramArr[index];
-    uint16_t maxv = maxArr[index];
-    if (*p < maxv) 
+    const ParamDesc *d = &paramDesc[index];
+    if (d->type == P8) 
     {
-        (*p)++;
+        uint8_t *p = (uint8_t *)d->ptr;
+        if (*p < (uint8_t)d->max) 
+        {
+            ++*p;
+        }
+        return *p;
+    } 
+    else 
+    {
+        uint16_t *p = (uint16_t *)d->ptr;
+        if (*p < d->max) 
+        {
+            ++*p;
+        }
+        return *p;
     }
-    return *p;
+}
+
+uint16_t decreaseParameterTempTime(uint8_t index) 
+{
+    
+    const ParamDesc *d = &paramDesc[index];
+    if (d->type == P8) 
+    {
+        uint8_t *p = (uint8_t *)d->ptr;
+        if (*p > (uint8_t)d->min)
+        {
+            --*p;
+        }
+        return *p;
+    } 
+    else 
+    {
+        uint16_t *p = (uint16_t *)d->ptr;
+        if (*p > d->min)
+        {
+            --*p;
+        }
+        return *p;
+    }
 }
 
 // *****************************************************************************
