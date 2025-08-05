@@ -110,13 +110,15 @@ extern void startTemperatureReading(void);
 extern uint16_t returnParameterTempTime(uint8_t index);
 extern float returnConstantsPID(uint8_t index);
 extern uint16_t increaseParameterTempTime(uint8_t index);
+extern uint16_t decreaseParameterTempTime(uint8_t index); 
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
 // *****************************************************************************
 // *****************************************************************************
 void returnHomeMenu(void);
-
+void goParametersMenu(void);
+char isTemperatureOrTime(uint8_t index);
 /* TODO:  Add any necessary local functions.
 */
 void returnHomeMenu(void)
@@ -133,6 +135,10 @@ void goParametersMenu(void)
     apphmiData.selectedOption = 0x00;
     apphmiData.firstVisibleIndex = 0x00;
     apphmiData.state =  APPHMI_STATE_REQUEST_START_SET_PARAMETERS;
+}
+char isTemperatureOrTime(uint8_t index)
+{
+    return ((index & 1) == 0) ? 'C' : 's';
 }
 // *****************************************************************************
 // *****************************************************************************
@@ -485,7 +491,7 @@ void APPHMI_Tasks ( void )
             {
                 if (apphmiData.selectedOption < 0x08)
                 {
-                    sprintf(apphmiData.bufferForStrings, "%u C", returnParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
+                    sprintf(apphmiData.bufferForStrings,"%u %c",returnParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
                 }
                 else
                 {
@@ -514,9 +520,14 @@ void APPHMI_Tasks ( void )
                 {
                     case ESC_BUTTON_PRESSED: goParametersMenu(); break;
                     case UP_BUTTON_PRESSED:
+                    case DOWN_BUTTON_PRESSED:    
                     {
-                        //LCDClear();//LCDChrXY_Scaled(5,15,(uint8_t *)"      ",2,true);LCDChrXY_Scaled only draws dark dots, the " " character, it does not plot it.
                         LCDStr_Scaled_Clear(5,15,5,2,true);
+                        apphmiData.doNotClearLCD = false;//With that boolean, I will discern whether it is an increase or decrease.
+                        if (UP_BUTTON_PRESSED == button)
+                        {
+                            apphmiData.doNotClearLCD = true;
+                        }
                         apphmiData.state = APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN;
                         break;
                     }
@@ -532,7 +543,16 @@ void APPHMI_Tasks ( void )
             {
                 if (apphmiData.selectedOption < 0x08)
                 {
-                    sprintf(apphmiData.bufferForStrings, "%u C", increaseParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
+                    //sprintf(apphmiData.bufferForStrings, "%u C", increaseParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
+                    if (apphmiData.doNotClearLCD)
+                    {
+                        apphmiData.doNotClearLCD = false; //It is important that it remains false after using it.
+                        sprintf(apphmiData.bufferForStrings,"%u %c",increaseParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
+                    }
+                    else
+                    {
+                        sprintf(apphmiData.bufferForStrings,"%u %c",decreaseParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
+                    }
                 }
                 LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,true);//set to true to update the LCD immediately
                 apphmiData.state = APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS;
