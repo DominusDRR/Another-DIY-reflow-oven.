@@ -111,6 +111,10 @@ extern uint16_t returnParameterTempTime(uint8_t index);
 extern float returnConstantsPID(uint8_t index);
 extern uint16_t increaseParameterTempTime(uint8_t index);
 extern uint16_t decreaseParameterTempTime(uint8_t index); 
+extern float increaseConstantsPID(uint8_t index);
+extern float decreaseConstantsPID(uint8_t index);
+extern void setParameter(uint8_t index, uint16_t value);
+extern void setConstantsPID(uint8_t index, float constantPID);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -491,11 +495,13 @@ void APPHMI_Tasks ( void )
             {
                 if (apphmiData.selectedOption < 0x08)
                 {
-                    sprintf(apphmiData.bufferForStrings,"%u %c",returnParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
+                    apphmiData.backupParameterTemperatureTime = returnParameterTempTime(apphmiData.selectedOption);
+                    sprintf(apphmiData.bufferForStrings,"%u %c",apphmiData.backupParameterTemperatureTime,isTemperatureOrTime(apphmiData.selectedOption));
                 }
                 else
                 {
-                    sprintf(apphmiData.bufferForStrings, "%.1f", returnConstantsPID(apphmiData.selectedOption));
+                    apphmiData.backupPIDConstant = returnConstantsPID(apphmiData.selectedOption);
+                    sprintf(apphmiData.bufferForStrings, "%.1f", apphmiData.backupPIDConstant);
                 }
                 LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,false);
                 apphmiData.state = APPHMI_STATE_UPDATE_LCD_VALUE_PARAMETER;
@@ -518,7 +524,19 @@ void APPHMI_Tasks ( void )
             {
                 switch (button)
                 {
-                    case ESC_BUTTON_PRESSED: goParametersMenu(); break;
+                    case ESC_BUTTON_PRESSED: 
+                    {
+                        if (apphmiData.selectedOption < 0x08)
+                        {
+                            setParameter(apphmiData.selectedOption,apphmiData.backupParameterTemperatureTime);//Pressing ESC returns to the original value.
+                        }
+                        else
+                        {
+                            setConstantsPID(apphmiData.selectedOption,apphmiData.backupPIDConstant);
+                        }
+                        goParametersMenu(); 
+                        break;
+                    }
                     case UP_BUTTON_PRESSED:
                     case DOWN_BUTTON_PRESSED:    
                     {
@@ -531,7 +549,7 @@ void APPHMI_Tasks ( void )
                         apphmiData.state = APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN;
                         break;
                     }
-                    default: break;    
+                    default:  goParametersMenu();  break;    
                 }
                 
             }
@@ -546,7 +564,6 @@ void APPHMI_Tasks ( void )
                     //sprintf(apphmiData.bufferForStrings, "%u C", increaseParameterTempTime(apphmiData.selectedOption));  // o snprintf(buffer, sizeof(buffer), "%u", valor);
                     if (apphmiData.doNotClearLCD)
                     {
-                        apphmiData.doNotClearLCD = false; //It is important that it remains false after using it.
                         sprintf(apphmiData.bufferForStrings,"%u %c",increaseParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
                     }
                     else
@@ -554,6 +571,18 @@ void APPHMI_Tasks ( void )
                         sprintf(apphmiData.bufferForStrings,"%u %c",decreaseParameterTempTime(apphmiData.selectedOption),isTemperatureOrTime(apphmiData.selectedOption));
                     }
                 }
+                else
+                {
+                    if (apphmiData.doNotClearLCD)
+                    {
+                        sprintf(apphmiData.bufferForStrings, "%.1f", increaseConstantsPID(apphmiData.selectedOption));
+                    }
+                    else
+                    {
+                        sprintf(apphmiData.bufferForStrings, "%.1f", decreaseConstantsPID(apphmiData.selectedOption));
+                    }
+                }
+                apphmiData.doNotClearLCD = false; //It is important that it remains false after using it.
                 LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,true);//set to true to update the LCD immediately
                 apphmiData.state = APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS;
             }
