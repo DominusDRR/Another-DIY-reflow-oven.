@@ -84,7 +84,9 @@ typedef enum
     APPHMI_STATE_SET_VALUE_PARAMETER,        
     APPHMI_STATE_UPDATE_LCD_VALUE_PARAMETER,
     APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS,
-    APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN        
+    APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN,
+    APPHMI_STATE_DISPLAY_PARAMETER_CHANGED_MESSAGE,
+    APPHMI_STATE_WAIT_DELAY_MESSAGE_PARAMETER_CHANGED        
 } APPHMI_STATES;
 
 
@@ -116,6 +118,8 @@ typedef struct
     char bufferForStrings[40];
     bool doNotClearLCD;
     uint8_t firstVisibleIndex;
+    uint16_t backupParameterTemperatureTime;
+    float backupPIDConstant;
 } APPHMI_DATA;
 
 // *****************************************************************************
