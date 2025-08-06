@@ -549,7 +549,10 @@ void APPHMI_Tasks ( void )
                         apphmiData.state = APPHMI_STATE_WAIT_ESCALATED_MESSAGE_CLEAN;
                         break;
                     }
-                    default:  goParametersMenu();  break;    
+                    default:  
+                    {
+                        apphmiData.state =  APPHMI_STATE_DISPLAY_PARAMETER_CHANGED_MESSAGE;
+                    }
                 }
                 
             }
@@ -586,6 +589,25 @@ void APPHMI_Tasks ( void )
                 LCDChrXY_Scaled(5,15,(uint8_t *)apphmiData.bufferForStrings,2,true);//set to true to update the LCD immediately
                 apphmiData.state = APPHMI_STATE_WAIT_USER_CHANGE_PARAMETERS;
             }
+            break;
+        }
+        case APPHMI_STATE_DISPLAY_PARAMETER_CHANGED_MESSAGE:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                LCDStr(0x04,(uint8_t *)"Parameter changed!",false, true);
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.state = APPHMI_STATE_WAIT_DELAY_MESSAGE_PARAMETER_CHANGED;
+            } 
+            break;
+        }
+        case APPHMI_STATE_WAIT_DELAY_MESSAGE_PARAMETER_CHANGED:
+        {
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _2000ms)
+            {
+                goParametersMenu();  
+            }
+            break;
         }
         /**************************************************************/
         /* The default state should never be executed. */
