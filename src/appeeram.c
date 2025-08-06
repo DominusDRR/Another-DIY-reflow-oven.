@@ -80,9 +80,17 @@
 #define TEMPERATURE_POINT_D_Sn_Pb           175
 #define TIME_POINT_D_Sn_Pb                  80
 /** PID controller constants **/
-#define KP  1
-#define KI  1
-#define KD  1
+#define KP  1.0f
+#define KI  1.0f
+#define KD  1.0f
+
+#define KPmax  1.0f
+#define KImax  1.0f
+#define KDmax  1.0f
+
+#define KPmin  0.0f
+#define KImin  0.0f
+#define KDmin  0.0f
 
 // *****************************************************************************
 /* Application Data
@@ -184,8 +192,12 @@ void setDefaultEERAMvalues(void);
 void initializeCRC(void* buffer);
 uint16_t returnParameterTempTime(uint8_t index);
 float returnConstantsPID(uint8_t index);
+void setConstantsPID(uint8_t index, float constantPID);
+float increaseConstantsPID(uint8_t index);
+float decreaseConstantsPID(uint8_t index);
 uint16_t increaseParameterTempTime(uint8_t index);
 uint16_t decreaseParameterTempTime(uint8_t index); 
+void setParameter(uint8_t index, uint16_t value);
 
 /* TODO:  Add any necessary local functions.
 */
@@ -368,6 +380,77 @@ float returnConstantsPID(uint8_t index)
     }
 }
 
+void setConstantsPID(uint8_t index, float constantPID)
+{
+    switch (index)
+    {
+        case 0x08:  appeeramData.Kp = constantPID; break;
+        case 0x09:  appeeramData.Ki = constantPID; break;
+        default:    appeeramData.Kd = constantPID; 
+    }
+}
+
+float increaseConstantsPID(uint8_t index)
+{
+    switch (index)
+    {
+        case 0x08:
+        {
+            if (appeeramData.Kp < KPmax)
+            {
+                appeeramData.Kp += 0.1f;
+            }
+            return appeeramData.Kp;
+        }
+        case 0x09:
+        {
+            if (appeeramData.Ki < KImax)
+            {
+                appeeramData.Ki += 0.1f;
+            }
+            return appeeramData.Ki;
+        }
+        default:
+        {
+            if (appeeramData.Kd < KDmax)
+            {
+                appeeramData.Kd += 0.1f;
+            }
+            return appeeramData.Kd;
+        }
+    }
+}
+float decreaseConstantsPID(uint8_t index)
+{
+    switch (index)
+    {
+        case 0x08:
+        {
+            if (appeeramData.Kp > KPmin)
+            {
+                appeeramData.Kp -= 0.1f;
+            }
+            return appeeramData.Kp;
+        }
+        case 0x09:
+        {
+            if (appeeramData.Ki > KImin)
+            {
+                appeeramData.Ki -= 0.1f;
+            }
+            return appeeramData.Ki;
+        }
+        default:
+        {
+            if (appeeramData.Kd > KDmin)
+            {
+                appeeramData.Kd -= 0.1f;
+            }
+            return appeeramData.Kd;
+        }
+    }
+}
+
 uint16_t increaseParameterTempTime(uint8_t index)
 {
     const ParamDesc *d = &paramDesc[index];
@@ -412,6 +495,23 @@ uint16_t decreaseParameterTempTime(uint8_t index)
             --*p;
         }
         return *p;
+    }
+}
+
+void setParameter(uint8_t index, uint16_t value)
+{
+    const ParamDesc *d = &paramDesc[index];
+    if (d->type == P8)
+    {
+        // Sólo baja 8 bits
+        uint8_t *p8 = (uint8_t *)d->ptr;
+        *p8 = (uint8_t)value;
+    }
+    else
+    {
+        // Rellena los 16 bits
+        uint16_t *p16 = (uint16_t *)d->ptr;
+        *p16 = value;
     }
 }
 
