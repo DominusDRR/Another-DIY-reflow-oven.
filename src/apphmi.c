@@ -81,6 +81,16 @@ const unsigned char *msgsParametersMenu[] =
     (unsigned char *)"11 Kd constant"
 };
 
+const unsigned char *msgsMenuParametersChanged[] = 
+{
+    (unsigned char *)" CHOOSE OPTION", // max 14 chars
+    (unsigned char *)" ", 
+    (unsigned char *)"Edit parameter", 
+    (unsigned char *)"View graph",
+    (unsigned char *)"Cancel changes",
+    (unsigned char *)"Accept changes"
+};
+
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
@@ -257,6 +267,7 @@ void APPHMI_Tasks ( void )
                         }
                         else if (0x03 == apphmiData.selectedOption) // To parameters Menu
                         {
+                            apphmiData.parametersBeenChanged = false;
                             goParametersMenu();
                         }
                         break;
@@ -463,7 +474,16 @@ void APPHMI_Tasks ( void )
                         }
                         break;
                     }
-                    default: returnHomeMenu();
+                    default: 
+                    {
+                        if (apphmiData.parametersBeenChanged)
+                        {
+                            apphmiData.messagePointer = 0x00; //I'm going to use messagePointer to do multiple things in a single state machine.
+                            apphmiData.state = APPHMI_STATE_VERIFY_PARAMETERS_HAVE_LOGICAL_VALUES;//APPHMI_STATE_GRAPHICALLY_DISPLAY_CHANGED_PARAMETERS;
+                            return;
+                        }
+                        returnHomeMenu();
+                    }
                 }
             }
             break;
@@ -534,12 +554,14 @@ void APPHMI_Tasks ( void )
                         {
                             setConstantsPID(apphmiData.selectedOption,apphmiData.backupPIDConstant);
                         }
+                        apphmiData.parametersBeenChanged = false;
                         goParametersMenu(); 
                         break;
                     }
                     case UP_BUTTON_PRESSED:
                     case DOWN_BUTTON_PRESSED:    
                     {
+                        apphmiData.parametersBeenChanged = true;
                         LCDStr_Scaled_Clear(5,15,5,2,true);
                         apphmiData.doNotClearLCD = false;//With that boolean, I will discern whether it is an increase or decrease.
                         if (UP_BUTTON_PRESSED == button)
@@ -606,6 +628,183 @@ void APPHMI_Tasks ( void )
             if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _2000ms)
             {
                 goParametersMenu();  
+            }
+            break;
+        }
+        /**********************************************************************/
+        /** The parameters that have been changed are displayed graphically. **/ 
+        case APPHMI_STATE_VERIFY_PARAMETERS_HAVE_LOGICAL_VALUES:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                switch (apphmiData.messagePointer)
+                {
+                    case 0x00:  
+                    {
+                        apphmiData.messagePointer++;
+                        LCDClear(); 
+                        break;
+                    }
+                    case 0x01:
+                    {
+                        apphmiData.adelay = RTC_Timer32CounterGet();
+                        if (returnParameterTempTime(0) > returnParameterTempTime(2))
+                        {
+                            LCDStr(0x01,(uint8_t *)"ERRORª Preheat temp higher than than flux temp",false,true);
+                            apphmiData.messagePointer++;
+                            return;
+                        }
+                        if (returnParameterTempTime(2) > returnParameterTempTime(4))
+                        {
+                            LCDStr(0x01,(uint8_t *)"ERRORª Flux temp higher than than reflow temp",false,true);
+                            apphmiData.messagePointer++;
+                            return;
+                        }
+                        if (returnParameterTempTime(6) > returnParameterTempTime(4))
+                        {
+                            LCDStr(0x01,(uint8_t *)"ERRORª Cooling temp higher than than reflow temp",false,true);
+                            apphmiData.messagePointer++;
+                            return;
+                        }
+                        apphmiData.messagePointer = 0x00; //I'm going to use messagePointer to do multiple things in a single state machine.
+                        apphmiData.state = APPHMI_STATE_GRAPHICALLY_DISPLAY_CHANGED_PARAMETERS;
+                        break;
+                    }
+                    default: 
+                    {
+                        if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _3000ms)
+                        {
+                            goParametersMenu();
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case APPHMI_STATE_GRAPHICALLY_DISPLAY_CHANGED_PARAMETERS:
+        {
+            if (IsGLCDTaskIdle()) // I wait until the GLCD task is idle
+            {
+                switch (apphmiData.messagePointer)
+                {
+                    case 0x00:  LCDClear();         break;
+                    case 0x01:  LCDLine (0,0,0,47); break;
+                    case 0x02:  LCDLine (0,47,83,47); break;
+                    case 0x03:
+                    {
+                        uint8_t i = 0x01; //to add up all the times that are on the X axis
+                        apphmiData.backupParameterTemperatureTime = 0x0000;
+                        do
+                        {
+                            apphmiData.backupParameterTemperatureTime += returnParameterTempTime(i);//Here I will save the sum of all the times
+                            i += 0x02;
+                        }while(i < 0x09);
+                        apphmiData.backupParameterTemperatureTime += 30;
+                        apphmiData.selectedOption = 0x00; //I'm going to use it as a pointer.
+                        apphmiData.x = 0x0000;
+                        apphmiData.y = 47;
+                        break;
+                    }
+                    case 0x04:
+                    {
+                        uint32_t xPrevious = apphmiData.x;
+                        uint32_t yPrevious = apphmiData.y;
+                        if (apphmiData.selectedOption < 0x08)
+                        {
+                            apphmiData.x += 83U*(uint32_t)(returnParameterTempTime(apphmiData.selectedOption + 0x01))/((uint32_t)apphmiData.backupParameterTemperatureTime);
+                            apphmiData.y = 49U - 47U*returnParameterTempTime(apphmiData.selectedOption)/270U;
+                        }
+                        else
+                        {
+                            apphmiData.x = 83;
+                            apphmiData.y = 23;
+                            apphmiData.state = APPHMI_STATE_WAIT_USER_PRESS_ANY_BUTTON;
+                        }
+                        LCDLine (xPrevious,yPrevious,apphmiData.x,apphmiData.y); 
+                        break;
+                    }
+                    case 0x05:
+                    {
+                        sprintf(apphmiData.bufferForStrings,"%uC",returnParameterTempTime(apphmiData.selectedOption));
+                        LCDTinyStr(apphmiData.x - 10U,apphmiData.y + 5U,apphmiData.bufferForStrings,true);
+                        break;
+                    }
+                    default:
+                    {
+                        sprintf(apphmiData.bufferForStrings,"%us",returnParameterTempTime(apphmiData.selectedOption + 0x01));
+                        LCDTinyStr((apphmiData.x - 1U),40,apphmiData.bufferForStrings,true);
+                        apphmiData.selectedOption += 0x02;
+                        if (apphmiData.selectedOption < 0x09)
+                        {
+                            apphmiData.messagePointer = 0x03; //To repeat from step 4
+                        }
+                    }
+                }
+                apphmiData.messagePointer++;
+            }
+            break;
+        }
+        /***  Menu where the user must accept to cancel or edit the parameters ***/
+        case APPHMI_STATE_WAIT_USER_PRESS_ANY_BUTTON:
+        {
+            if (NO_BUTTON_PRESSED != getPressedBtn() && IsGLCDTaskIdle())
+            {
+                LCDClear();
+                apphmiData.messagePointer = 0x00;
+                apphmiData.selectedOption = 0x02;
+                apphmiData.state = APPHMI_STATE_DRAW_MENU_APPROVE_EDIT_CANCEL_MODIFIED_PARAMETERS;
+            }
+            break;
+        }
+        case APPHMI_STATE_DRAW_MENU_APPROVE_EDIT_CANCEL_MODIFIED_PARAMETERS:
+        {
+            if (IsGLCDTaskIdle())
+            {
+                if (apphmiData.messagePointer < 0x06)
+                {
+                    LCDStr(apphmiData.messagePointer, msgsMenuParametersChanged[apphmiData.messagePointer], (apphmiData.selectedOption == apphmiData.messagePointer), false);
+                    apphmiData.messagePointer++;
+                }
+                else
+                {
+                    apphmiData.stateToReturn = APPHMI_STATE_WAIT_USER_SELECTION_MENU_APPROVE_EDIT_CANCEL_MODIFIED_PARAMETERS;
+                    apphmiData.state = APPHMI_STATE_UPDATE_HOME_MENU;
+                }
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_USER_SELECTION_MENU_APPROVE_EDIT_CANCEL_MODIFIED_PARAMETERS:
+        {
+            uint8_t button = getPressedBtn();
+            if (NO_BUTTON_PRESSED != button && IsGLCDTaskIdle())
+            {
+                switch (button)
+                {
+                    case UP_BUTTON_PRESSED:
+                    case DOWN_BUTTON_PRESSED:
+                    {
+                        if (button == UP_BUTTON_PRESSED)
+                        {
+                            apphmiData.selectedOption--;
+                            if (apphmiData.selectedOption < 2)
+                            {
+                                apphmiData.selectedOption = 5;
+                            }
+                        }
+                        else // DOWN
+                        {
+                            apphmiData.selectedOption++;
+                            if (apphmiData.selectedOption > 5)
+                            {
+                                apphmiData.selectedOption = 2;
+                            }
+                        }
+                        apphmiData.messagePointer = 0x00;
+                        apphmiData.state = APPHMI_STATE_DRAW_MENU_APPROVE_EDIT_CANCEL_MODIFIED_PARAMETERS;
+                        break;
+                    }
+                    default: break; // case ESC
+                }
             }
             break;
         }
