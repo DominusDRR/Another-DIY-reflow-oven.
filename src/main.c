@@ -41,6 +41,7 @@ int main ( void )
 
     while ( true )
     {
+        WDT_Clear(); //reset to WDT
         /* Maintain state machines of all polled MPLAB Harmony modules. */
         SYS_Tasks ( );
     }
