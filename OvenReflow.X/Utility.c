@@ -21,5 +21,5 @@
 //Gets the unsigned 32-bit absolute value
 uint32_t abs_diff_uint32(uint32_t a, uint32_t b)
 {
-    return (a > b)? (a -b):(b-a);
+    return (a > b)? (a - b):(b - a);
 } 
