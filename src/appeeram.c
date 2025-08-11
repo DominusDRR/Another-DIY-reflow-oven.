@@ -189,6 +189,7 @@ void APPEERAM_I2C_EventHandler (DRV_I2C_TRANSFER_EVENT event,DRV_I2C_TRANSFER_HA
 APPEERAM_STATES analyzeNumberAttempts(void);
 bool verifyDataStoredInEERAM(void);
 void setDefaultEERAMvalues(void);
+void upDatetEERAMvalues(void);
 void initializeCRC(void* buffer);
 uint16_t returnParameterTempTime(uint8_t index);
 float returnConstantsPID(uint8_t index);
@@ -198,6 +199,8 @@ float decreaseConstantsPID(uint8_t index);
 uint16_t increaseParameterTempTime(uint8_t index);
 uint16_t decreaseParameterTempTime(uint8_t index); 
 void setParameter(uint8_t index, uint16_t value);
+bool IsEERAMMTaskIdle (void);
+void initializeWriteEERAM(void);
 
 /* TODO:  Add any necessary local functions.
 */
@@ -345,6 +348,29 @@ void setDefaultEERAMvalues(void)
     memcpy(&BufferTransmission[0x10],&appeeramData.Ki,sizeof(appeeramData.Ki));
     
     appeeramData.Kd = KD;
+    memcpy(&BufferTransmission[0x14],&appeeramData.Kd,sizeof(appeeramData.Kd));
+}
+void upDatetEERAMvalues(void)
+{
+    BufferTransmission[0x00] = appeeramData.temperatureA;
+    BufferTransmission[0x03] = appeeramData.temperatureB;
+    BufferTransmission[0x06] = appeeramData.temperatureC;
+    BufferTransmission[0x09] = appeeramData.temperatureD;      
+            
+    BufferTransmission[0x01] = (uint8_t)(appeeramData.timeA & 0xFF);    // LSB (byte menos significativo)
+    BufferTransmission[0x02] = (uint8_t)((appeeramData.timeA >> 8) & 0xFF); // MSB (byte más significativo)
+    
+    BufferTransmission[0x04] = (uint8_t)(appeeramData.timeB & 0xFF);    // LSB (byte menos significativo)
+    BufferTransmission[0x05] = (uint8_t)((appeeramData.timeB >> 8) & 0xFF); // MSB (byte más significativo)
+    
+    BufferTransmission[0x07] = (uint8_t)(appeeramData.timeC & 0xFF);    // LSB (byte menos significativo)
+    BufferTransmission[0x08] = (uint8_t)((appeeramData.timeC >> 8) & 0xFF); // MSB (byte más significativo)
+    
+    BufferTransmission[0x0A] = (uint8_t)(appeeramData.timeD & 0xFF);    // LSB (byte menos significativo)
+    BufferTransmission[0x0B] = (uint8_t)((appeeramData.timeD >> 8) & 0xFF); // MSB (byte más significativo)
+            
+    memcpy(&BufferTransmission[0x0C],&appeeramData.Kp,sizeof(appeeramData.Kp));
+    memcpy(&BufferTransmission[0x10],&appeeramData.Ki,sizeof(appeeramData.Ki));
     memcpy(&BufferTransmission[0x14],&appeeramData.Kd,sizeof(appeeramData.Kd));
 }
 void initializeCRC(void* buffer)
@@ -513,6 +539,18 @@ void setParameter(uint8_t index, uint16_t value)
         uint16_t *p16 = (uint16_t *)d->ptr;
         *p16 = value;
     }
+}
+bool IsEERAMMTaskIdle (void)
+{
+    if (APPEERAM_STATE_IDLE == appeeramData.state)
+    {
+        return true;
+    }
+    return false;
+}
+void initializeWriteEERAM(void)
+{
+    appeeramData.state = APPEERAM_STATE_INITIALIZE_CRC_WRITE;
 }
 
 // *****************************************************************************
