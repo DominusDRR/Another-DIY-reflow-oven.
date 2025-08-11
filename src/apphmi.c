@@ -125,6 +125,9 @@ extern float increaseConstantsPID(uint8_t index);
 extern float decreaseConstantsPID(uint8_t index);
 extern void setParameter(uint8_t index, uint16_t value);
 extern void setConstantsPID(uint8_t index, float constantPID);
+extern void upDatetEERAMvalues(void);
+extern bool IsEERAMMTaskIdle (void);
+extern void initializeWriteEERAM(void);
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Local Functions
@@ -780,6 +783,32 @@ void APPHMI_Tasks ( void )
             {
                 switch (button)
                 {
+                    case OK_BUTTON_PRESSED:
+                    {
+                        switch(apphmiData.selectedOption)
+                        {
+                            case 0x02: 
+                            {
+                                apphmiData.parametersBeenChanged = false;
+                                goParametersMenu();
+                                break;
+                            }
+                            case 0x03:  
+                            {
+                                apphmiData.messagePointer = 0x00; //I'm going to use messagePointer to do multiple things in a single state machine.
+                                apphmiData.state = APPHMI_STATE_GRAPHICALLY_DISPLAY_CHANGED_PARAMETERS;
+                                break;
+                            }
+                            case 0x04:        
+                            {
+                                apphmiData.selectedOption = 0x02;
+                                apphmiData.state = APPHMI_STATE_CLEAR_LCD; //return to home menu
+                                break;
+                            }
+                            default: apphmiData.state = APPHMI_STATE_WAIT_EERAM_TASK_IDLE;//Save the parameters to EERAM and return to the home menu
+                        }
+                        break;
+                    }
                     case UP_BUTTON_PRESSED:
                     case DOWN_BUTTON_PRESSED:
                     {
@@ -805,6 +834,35 @@ void APPHMI_Tasks ( void )
                     }
                     default: break; // case ESC
                 }
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_EERAM_TASK_IDLE:
+        {
+            if (IsEERAMMTaskIdle() && IsGLCDTaskIdle())
+            {
+                LCDClear();
+                upDatetEERAMvalues(); 
+                initializeWriteEERAM();
+                apphmiData.state = APPHMI_STATE_WAIT_EERAM_UPDATE_COMPLETED;
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_EERAM_UPDATE_COMPLETED:
+        {
+            if (IsEERAMMTaskIdle() && IsGLCDTaskIdle())
+            {
+                LCDStr(0x02,(unsigned char *)"Parameters  have been updated!",false, true);
+                apphmiData.adelay = RTC_Timer32CounterGet();
+                apphmiData.state = APPHMI_STATE_WAIT_UPDATED_PARAMETERS_MESSAGE ;
+            }
+            break;
+        }
+        case APPHMI_STATE_WAIT_UPDATED_PARAMETERS_MESSAGE:
+        {
+            if ( abs_diff_uint32(RTC_Timer32CounterGet(), apphmiData.adelay) > _2000ms)
+            {
+                returnHomeMenu();
             }
             break;
         }
