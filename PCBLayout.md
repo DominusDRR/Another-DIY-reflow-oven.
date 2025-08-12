@@ -14,4 +14,9 @@ The second PCB is the main board, where the microcontroller and the necessary pe
 
 ![image](https://github.com/user-attachments/assets/4d60f2f3-197c-45a6-84bf-4316afd82be6)
 
+Once manufactured they look like this:
+
+![image](https://github.com/user-attachments/assets/abf5ec3b-6844-4377-89ec-7cb4557295b9").
+
+
 
