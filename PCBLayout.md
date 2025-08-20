@@ -24,5 +24,11 @@ This is what it looks like with the elements in place
 
 ![image](https://github.com/user-attachments/assets/d762785b-39d4-4d2b-99cc-fd57100182f2).
 
+![image](https://github.com/user-attachments/assets/233a9d76-3777-4241-8259-3be27decc89e).
+
+![image](https://github.com/user-attachments/assets/57177f00-e63c-4b76-baf5-7999e4b32c52).
+
+
+
 
 
