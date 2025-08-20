@@ -26,7 +26,7 @@ This is what it looks like with the elements in place
 
 ![image](https://github.com/user-attachments/assets/233a9d76-3777-4241-8259-3be27decc89e).
 
-The power card, I haven't placed the varistors yet, I didn't have them when I took the photo.
+The power board, I haven't placed the varistors yet, I didn't have them when I took the photo.
 
 ![image](https://github.com/user-attachments/assets/57177f00-e63c-4b76-baf5-7999e4b32c52).
 
